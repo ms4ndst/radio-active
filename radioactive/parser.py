@@ -57,4 +57,7 @@ def parse_options():
     options["volume"] = args.volume
     options["audio_player"] = args.audio_player
 
+    # Recording behaviour
+    options["force_mp3"] = getattr(args, "force_mp3", False)
+
     return options

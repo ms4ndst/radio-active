@@ -36,6 +36,8 @@ def record_audio_from_url(input_url, output_file, force_mp3, loglevel):
         # Construct the FFmpeg command
         ffmpeg_command = [
             "ffmpeg",
+            "-nostdin",  # avoid interactive stdin blocking
+            "-y",        # overwrite output file if exists
             "-i",
             input_url,  # input URL
             "-vn",  # disable video recording

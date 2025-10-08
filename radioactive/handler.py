@@ -7,6 +7,13 @@ import json
 import sys
 
 import requests_cache
+import warnings
+# Suppress deprecation warning emitted when pyradios imports pkg_resources
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+)
 from pyradios import RadioBrowser
 from rich.console import Console
 from rich.table import Table

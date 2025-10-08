@@ -246,6 +246,15 @@ class Parser:
             help="specify the audio player to use. ffplay/vlc/mpv",
         )
 
+        # Always force MP3 when recording (configurable)
+        self.parser.add_argument(
+            "--force-mp3",
+            action="store_true",
+            dest="force_mp3",
+            default=self.defaults.get("force_mp3", False),
+            help="Always record using mp3 (overrides auto codec)",
+        )
+
     def parse(self):
         self.result = self.parser.parse_args()
         if self.result is None:

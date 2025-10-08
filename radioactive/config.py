@@ -22,6 +22,7 @@ def write_a_sample_config_file():
         "filepath": "/home/{user}/recordings/radioactive/",
         "filetype": "mp3",
         "player": "ffplay",
+        "force_mp3": "false",
     }
 
     # Get the user's home directory
@@ -66,6 +67,12 @@ class Configs:
             )
             options["filetype"] = self.config.get("AppConfig", "filetype")
             options["player"] = self.config.get("AppConfig", "player")
+            # Optional: always force mp3 when recording
+            try:
+                force_val = self.config.get("AppConfig", "force_mp3", fallback="false")
+            except Exception:
+                force_val = "false"
+            options["force_mp3"] = str(force_val).strip().lower() in ["1", "true", "yes", "on"]
 
             return options
 

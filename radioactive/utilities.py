@@ -6,15 +6,35 @@ import os
 import subprocess
 import sys
 from random import randint
+from time import sleep
+import threading
+import atexit
 
 import requests
 from pick import pick
 from rich import print
-from rich.console import Console
+from rich.console import Console, Group
+from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from zenlog import log
+
+# Windows single-key support
+try:
+    import msvcrt  # type: ignore
+except Exception:
+    msvcrt = None
+
+# POSIX single-key support
+try:
+    import termios  # type: ignore
+    import tty  # type: ignore
+    import select  # type: ignore
+except Exception:
+    termios = None
+    tty = None
+    select = None
 
 from radioactive.ffplay import kill_background_ffplays
 from radioactive.last_station import Last_station
@@ -24,6 +44,15 @@ RED_COLOR = "\033[91m"
 END_COLOR = "\033[0m"
 
 global_current_station_info = {}
+
+# Live UI globals
+_global_now_playing_live = None
+_global_now_playing_station = ""
+_global_now_playing_title = ""
+_global_now_playing_hints = ""
+_global_now_playing_messages: list[str] = []
+_global_now_playing_input_active = False
+_force_mp3_always = False
 
 
 def handle_fetch_song_title(url):
@@ -60,6 +89,174 @@ def handle_fetch_song_title(url):
         log.error("No track information available")
 
 
+def get_song_title(url: str) -> str:
+    """Return current StreamTitle from ffprobe, else empty string."""
+    cmd = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_entries",
+        "format=icy",
+        url,
+    ]
+    try:
+        output = subprocess.check_output(cmd).decode("utf-8")
+        data = json.loads(output)
+        return data.get("format", {}).get("tags", {}).get("StreamTitle", "")
+    except Exception as e:
+        log.debug(f"get_song_title error: {e}")
+        return ""
+
+
+def _make_now_playing_panel(station_name: str, track_title: str) -> Panel:
+    title = Text(station_name or "Unknown Station", style="bold cyan", justify="center")
+    body = Text(f"🎶 {track_title or 'Fetching…'}", justify="center")
+    return Panel(body, title=title, width=85)
+
+
+def _make_now_playing_view(station_name: str, track_title: str, hints: str, messages: list[str]):
+    # Top: Now Playing panel
+    panel_now = _make_now_playing_panel(station_name, track_title)
+    # Middle: Info panel
+    body = Text("\n".join(messages) if messages else "")
+    panel_info = Panel(body, title="[b]Info[/b]", width=85)
+    # Bottom: Keys
+    hints_text = Text.from_markup(hints) if hints else Text("")
+    return Group(panel_now, panel_info, hints_text)
+
+
+def _update_live_view():
+    if _global_now_playing_live:
+        _global_now_playing_live.update(
+            _make_now_playing_view(
+                _global_now_playing_station,
+                _global_now_playing_title,
+                _global_now_playing_hints,
+                _global_now_playing_messages,
+            )
+        )
+
+
+def set_info_text(text: str):
+    global _global_now_playing_messages
+    _global_now_playing_messages = [text.rstrip("\n")] if text else []
+    _update_live_view()
+
+
+def set_info_lines(lines: list[str]):
+    global _global_now_playing_messages
+    _global_now_playing_messages = [l.rstrip("\n") for l in lines]
+    _update_live_view()
+
+
+def safe_input(prompt: str) -> str:
+    """Prompt for input below the Live view (under the Keys row).
+
+    Uses a stop/start cycle for Rich Live (pause is not available in rich==14.x).
+    """
+    global _global_now_playing_live, _global_now_playing_input_active
+    if _global_now_playing_live is not None:
+        _global_now_playing_input_active = True
+        try:
+            # Stop live rendering so the prompt can render beneath the Keys row
+            try:
+                _global_now_playing_live.stop()
+            except Exception:
+                pass
+            # print a separator newline and prompt
+            try:
+                _global_now_playing_live.console.print("")
+            except Exception:
+                pass
+            value = _global_now_playing_live.console.input(prompt)
+        finally:
+            # Restart live and restore the view
+            try:
+                _global_now_playing_live.start()
+            except Exception:
+                pass
+            _global_now_playing_input_active = False
+            _update_live_view()
+        return value
+    # fallback if Live not running
+    return input(prompt)
+
+
+def set_force_mp3(flag: bool):
+    global _force_mp3_always
+    _force_mp3_always = bool(flag)
+
+
+def start_now_playing_live(station_name: str, target_url: str, interval_seconds: int = 15) -> Live:
+    """Start Live UI and a background worker that updates song title."""
+    global _global_now_playing_live, _global_now_playing_station, _global_now_playing_title
+    global _global_now_playing_hints, _global_now_playing_messages
+
+    _global_now_playing_station = station_name
+    _global_now_playing_title = ""
+    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  t=Track  i=Info  r=Record  n=RecordFile  f=Fav  w=List  h=Help  q=Quit"
+    _global_now_playing_messages = []
+
+    live = Live(
+        _make_now_playing_view(_global_now_playing_station, _global_now_playing_title, _global_now_playing_hints, _global_now_playing_messages),
+        refresh_per_second=8,
+        screen=False,
+        transient=False,
+    )
+    live.start()
+    _global_now_playing_live = live
+
+    def _worker(url, interval):
+        global _global_now_playing_title, _global_now_playing_input_active
+        last = None
+        while True:
+            try:
+                if _global_now_playing_input_active:
+                    sleep(0.1)
+                    continue
+                title = get_song_title(url)
+                if title and title != last:
+                    _global_now_playing_title = title
+                    _update_live_view()
+                    last = title
+            except Exception as e:
+                log.debug(f"live worker error: {e}")
+            sleep(interval)
+
+    threading.Thread(target=_worker, args=(target_url, interval_seconds), daemon=True).start()
+    atexit.register(lambda: (_global_now_playing_live and _global_now_playing_live.stop()))
+    return live
+
+
+def _default_record_filename(curr_station_name: str) -> str:
+    now = datetime.datetime.now()
+    month_name = now.strftime("%b").upper()
+    am_pm = now.strftime("%p")
+    ts = now.strftime(f"%d-{month_name}-%Y@%I-%M-%S-{am_pm}")
+    return f"{curr_station_name.strip()}-{ts}".replace(" ", "-")
+
+
+def _normalize_record_path(path_str: str) -> str:
+    # Map Linux-style /home/<user>/... to Windows %USERPROFILE% on Windows
+    if os.name == "nt" and path_str:
+        # Collapse env and user
+        path_str = os.path.expandvars(path_str)
+        path_str = os.path.expanduser(path_str)
+        if path_str.startswith("/home/"):
+            parts = path_str.split("/", 3)
+            # ['', 'home', '<user>', 'rest...']
+            if len(parts) >= 4:
+                remainder = parts[3]
+                base = os.path.expanduser("~")
+                path_str = os.path.join(base, remainder.replace("/", os.sep))
+            else:
+                path_str = os.path.expanduser("~")
+    return os.path.abspath(path_str) if path_str else path_str
+
+
 def handle_record(
     target_url,
     curr_station_name,
@@ -70,6 +267,9 @@ def handle_record(
 ):
     log.info("Press 'q' to stop recording")
     force_mp3 = False
+    if _force_mp3_always:
+        force_mp3 = True
+        record_file_format = "mp3"
 
     if record_file_format != "mp3" and record_file_format != "auto":
         record_file_format = "mp3"  # default to mp3
@@ -90,14 +290,23 @@ def handle_record(
         # it is better to leave it on libmp3lame
         force_mp3 = True
 
+    # Normalize target path (fix Linux-style path on Windows)
+    if record_file_path:
+        record_file_path = _normalize_record_path(record_file_path)
+
     if record_file_path and not os.path.exists(record_file_path):
         log.debug("filepath: {}".format(record_file_path))
-        os.makedirs(record_file_path, exist_ok=True)
+        try:
+            os.makedirs(record_file_path, exist_ok=True)
+        except Exception as e:
+            log.debug(f"Could not create specified path, falling back: {e}")
+            record_file_path = os.path.join(os.path.expanduser("~"), "Music", "radioactive")
+            os.makedirs(record_file_path, exist_ok=True)
 
     elif not record_file_path:
         log.debug("filepath: fallback to default path")
         record_file_path = os.path.join(
-            os.path.expanduser("~"), "Music/radioactive"
+            os.path.expanduser("~"), "Music", "radioactive"
         )  # fallback path
         try:
             os.makedirs(record_file_path, exist_ok=True)
@@ -106,28 +315,28 @@ def handle_record(
             log.error("Could not make default directory")
             sys.exit(1)
 
-    now = datetime.datetime.now()
-    month_name = now.strftime("%b").upper()
-    # Format AM/PM as 'AM' or 'PM'
-    am_pm = now.strftime("%p")
-
-    # format is : day-monthname-year@hour-minute-second-(AM/PM)
-    formatted_date_time = now.strftime(f"%d-{month_name}-%Y@%I-%M-%S-{am_pm}")
-
     if not record_file_format.strip():
         record_file_format = "mp3"
 
     if not record_file:
-        record_file = "{}-{}".format(
-            curr_station_name.strip(), formatted_date_time
-        ).replace(" ", "-")
+        record_file = _default_record_filename(curr_station_name)
 
     tmp_filename = f"{record_file}.{record_file_format}"
     outfile_path = os.path.join(record_file_path, tmp_filename)
 
     log.info(f"Recording will be saved as: \n{outfile_path}")
+    # Update Info panel with one-line status before and after
+    try:
+        set_info_text(f"Recording… to: {outfile_path}")
+    except Exception:
+        pass
 
     record_audio_from_url(target_url, outfile_path, force_mp3, loglevel)
+
+    try:
+        set_info_text(f"Recording complete: {outfile_path}")
+    except Exception:
+        pass
 
 
 def handle_welcome_screen():
@@ -179,7 +388,10 @@ def handle_favorite_table(alias):
     if len(alias.alias_map) > 0:
         for entry in alias.alias_map:
             table.add_row(entry["name"], entry["uuid_or_url"])
-        print(table)
+        # Render and replace Info panel
+        cap = Console(record=True, width=85)
+        cap.print(table)
+        set_info_text(cap.export_text())
         log.info(f"Your favorite stations are saved in {alias.alias_path}")
     else:
         log.info("You have no favorite station list")
@@ -199,7 +411,8 @@ def handle_show_station_info():
         custom_info["tags"] = global_current_station_info["tags"]
         custom_info["codec"] = global_current_station_info["codec"]
         custom_info["bitrate"] = global_current_station_info["bitrate"]
-        print(custom_info)
+        import json as _json
+        set_info_text(_json.dumps(custom_info, indent=2))
     except:
         log.error("No station information available")
 
@@ -354,6 +567,156 @@ def handle_save_last_station(last_station, station_name, station_url):
     last_station.save_info(last_played_station)
 
 
+def _get_single_key() -> str | None:
+    # Windows
+    if os.name == "nt" and msvcrt is not None:
+        if msvcrt.kbhit():
+            try:
+                return msvcrt.getwch()
+            except Exception:
+                return None
+        return None
+    # POSIX
+    if termios and tty and select and sys.stdin.isatty():
+        try:
+            r, _, _ = select.select([sys.stdin], [], [], 0)
+            if r:
+                return sys.stdin.read(1)
+        except Exception:
+            return None
+        return None
+    return None
+
+
+class _PosixKeyReader:
+    def __enter__(self):
+        if os.name != "nt" and termios and tty and sys.stdin.isatty():
+            self.fd = sys.stdin.fileno()
+            self.old = termios.tcgetattr(self.fd)
+            tty.setcbreak(self.fd)
+        else:
+            self.fd = None
+            self.old = None
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if self.fd is not None and self.old is not None:
+                termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old)
+        except Exception:
+            pass
+
+
+def _handle_keypress_loop_hotkeys(
+    alias,
+    player,
+    target_url,
+    station_name,
+    station_url,
+    record_file_path,
+    record_file,
+    record_file_format,
+    loglevel,
+):
+    def _handle(ch: str):
+        nonlocal record_file_format
+        if ch in ("p", "P"):
+            player.toggle()
+        elif ch in ("t", "T"):
+            # show track title once
+            title = get_song_title(target_url)
+            set_info_text(title if title else "No track information available")
+        elif ch in ("i", "I"):
+            handle_show_station_info()
+        elif ch in ("r", "R"):
+            # Stop live, run recording, then restart live
+            if _global_now_playing_live:
+                try:
+                    _global_now_playing_live.stop()
+                except Exception:
+                    pass
+            handle_record(
+                target_url,
+                station_name,
+                record_file_path,
+                record_file,
+                record_file_format,
+                loglevel,
+            )
+            if _global_now_playing_live:
+                try:
+                    _global_now_playing_live.start()
+                except Exception:
+                    pass
+                _update_live_view()
+        elif ch in ("n", "N"):
+            default_name = _default_record_filename(station_name)
+            try:
+                fname = safe_input(f"Enter output filename [default: {default_name}]: ")
+            except EOFError:
+                fname = ""
+            if not fname.strip():
+                file_name = default_name
+                rec_fmt = record_file_format
+            else:
+                rec_fmt = record_file_format
+                try:
+                    file_name, file_ext = fname.split(".")
+                    if file_ext.lower() == "mp3":
+                        rec_fmt = "mp3"
+                    else:
+                        log.warning("You can only specify mp3 as file extension.")
+                        log.warning("Do not provide any extension to autodetect the codec.")
+                except Exception:
+                    file_name = fname
+            if _global_now_playing_live:
+                try:
+                    _global_now_playing_live.stop()
+                except Exception:
+                    pass
+            handle_record(
+                target_url,
+                station_name,
+                record_file_path,
+                file_name,
+                rec_fmt,
+                loglevel,
+            )
+            if _global_now_playing_live:
+                try:
+                    _global_now_playing_live.start()
+                except Exception:
+                    pass
+                _update_live_view()
+        elif ch in ("f", "F"):
+            handle_add_to_favorite(alias, station_name, station_url)
+            set_info_text(f"Added to favorites: {station_name}")
+        elif ch in ("w", "W"):
+            alias.generate_map()
+            handle_favorite_table(alias)
+        elif ch in ("h", "H", "?"):
+            set_info_lines([
+                "p: Play/Pause current station",
+                "t/track: Current track info",
+                "i/info: Station information",
+                "r/record: Record a station",
+                "n: Record with custom filename",
+                "f/fav: Add station to favorite list",
+                "h/help/?: Show this help message",
+                "q/quit: Quit radioactive",
+            ])
+        elif ch in ("q", "Q"):
+            player.stop()
+            sys.exit(0)
+
+    with _PosixKeyReader():
+        while True:
+            ch = _get_single_key()
+            if ch is not None:
+                _handle(ch)
+            sleep(0.05)
+
+
 def handle_listen_keypress(
     alias,
     player,
@@ -365,89 +728,18 @@ def handle_listen_keypress(
     record_file_format,
     loglevel,
 ):
-    log.info("Press '?' to see available commands\n")
-    while True:
-        try:
-            user_input = input("Enter a command to perform an action: ")
-        except EOFError:
-            print()
-            log.debug("Ctrl+D (EOF) detected. Exiting gracefully.")
-            kill_background_ffplays()
-            sys.exit(0)
-
-        if user_input in ["r", "R", "record"]:
-            handle_record(
-                target_url,
-                station_name,
-                record_file_path,
-                record_file,
-                record_file_format,
-                loglevel,
-            )
-        elif user_input in ["rf", "RF", "recordfile"]:
-            # if no filename is provided try to auto detect
-            # else if ".mp3" is provided, use libmp3lame to force write to mp3
-            try:
-                user_input = input("Enter output filename: ")
-            except EOFError:
-                print()
-                log.debug("Ctrl+D (EOF) detected. Exiting gracefully.")
-                kill_background_ffplays()
-                sys.exit(0)
-
-            # try to get extension from filename
-            try:
-                file_name, file_ext = user_input.split(".")
-                if file_ext == "mp3":
-                    log.debug("codec: force mp3")
-                    # overwrite original codec with "mp3"
-                    record_file_format = "mp3"
-                else:
-                    log.warning("You can only specify mp3 as file extension.\n")
-                    log.warning(
-                        "Do not provide any extension to autodetect the codec.\n"
-                    )
-            except:
-                file_name = user_input
-
-            if user_input.strip() != "":
-                handle_record(
-                    target_url,
-                    station_name,
-                    record_file_path,
-                    file_name,
-                    record_file_format,
-                    loglevel,
-                )
-        elif user_input in ["i", "I", "info"]:
-            handle_show_station_info()
-
-        elif user_input in ["f", "F", "fav"]:
-            handle_add_to_favorite(alias, station_name, station_url)
-
-        elif user_input in ["q", "Q", "quit"]:
-            # kill_background_ffplays()
-            player.stop()
-            sys.exit(0)
-        elif user_input in ["w", "W", "list"]:
-            alias.generate_map()
-            handle_favorite_table(alias)
-        elif user_input in ["t", "T", "track"]:
-            handle_fetch_song_title(target_url)
-        elif user_input in ["p", "P"]:
-            # toggle the player (start/stop)
-            player.toggle()
-            # TODO: toggle the player
-
-        elif user_input in ["h", "H", "?", "help"]:
-            log.info("p: Play/Pause current station")
-            log.info("t/track: Current track info")
-            log.info("i/info: Station information")
-            log.info("r/record: Record a station")
-            log.info("rf/recordfile: Specify a filename for the recording")
-            log.info("f/fav: Add station to favorite list")
-            log.info("h/help/?: Show this help message")
-            log.info("q/quit: Quit radioactive")
+    # hotkey loop (cross-platform)
+    return _handle_keypress_loop_hotkeys(
+        alias,
+        player,
+        target_url,
+        station_name,
+        station_url,
+        record_file_path,
+        record_file,
+        record_file_format,
+        loglevel,
+    )
 
 
 def handle_current_play_panel(curr_station_name=""):

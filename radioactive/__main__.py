@@ -31,6 +31,8 @@ from radioactive.utilities import (
     handle_update_screen,
     handle_user_choice_from_search_result,
     handle_welcome_screen,
+    start_now_playing_live,
+    set_force_mp3,
 )
 
 # globally needed as signal handler needs it
@@ -77,12 +79,16 @@ def final_step(options, last_station, alias, handler):
         last_station, options["curr_station_name"], options["target_url"]
     )
 
+    # Apply recording behaviour from config/args
+    set_force_mp3(options.get("force_mp3", False))
+
     if options["add_to_favorite"]:
         handle_add_to_favorite(
             alias, options["curr_station_name"], options["target_url"]
         )
 
-    handle_current_play_panel(options["curr_station_name"])
+    # Start Live Now Playing view (song updates + keys/info below)
+    start_now_playing_live(options["curr_station_name"], options["target_url"], interval_seconds=15)
 
     if options["record_stream"]:
         handle_record(
