@@ -125,6 +125,10 @@ Search a station with `radio --search [STATION_NAME]` or simply `radio` :zap: to
 <a align=center href="https://asciinema.org/a/611668" target="_blank"><img src="https://asciinema.org/a/617580.svg" /></a>
 
 
+### Live UI Prompt
+
+When running with the Live UI (default, including when using `--auto-track`), the input prompt is rendered inside the Live panel, directly below the Now Playing info. You can type commands immediately without losing the panel.
+
 ### Options
 
 
@@ -141,8 +145,9 @@ Search a station with `radio --search [STATION_NAME]` or simply `radio` :zap: to
 | `--record` , `-R`  | Optional | Record a station and save to file              | False         |                        |
 | `--filename`, `-N` | Optional | Filename to used to save the recorded audio    | None          |                        |
 | `--filepath`       | Optional | Path to save the recordings                    | <DEFAULT_DIR> |                        |
-| `--filetype`, `-T` | Optional | Format of the recording                        | mp3           | `mp3`,`auto`           |
-| `--last`           | Optional | Play last played station                       | False         |                        |
+|| `--filetype`, `-T` | Optional | Format of the recording                        | mp3           | `mp3`,`auto`           |
+|| `--force-mp3`     | Optional | Force MP3 output for recordings (overrides auto/extension) | False         |                        |
+|| `--last`           | Optional | Play last played station                       | False         |                        |
 | `--random`         | Optional | Play a random station from favorite list       | False         |                        |
 | `--sort`           | Optional | Sort the result page                           | votes         |                        |
 | `--filter`         | Optional | Filter search results                          | None          |                        |
@@ -181,7 +186,7 @@ Search a station with `radio --search [STATION_NAME]` or simply `radio` :zap: to
 
 > `--filetype`: Specify the extension of the final recording file. default is `mp3`. you can provide `-T auto` to autodetect the codec and set file extension accordingly (in original form).
 
-> DEFAULT_DIR: is `/home/user/Music/radioactive`
+> DEFAULT_DIR: Linux/macOS: `/home/user/Music/radioactive`; Windows: `%USERPROFILE%\\Music\\radioactive`
 
 ### Runtime Commands
 
@@ -256,6 +261,7 @@ filter = none
 volume = 80
 filepath = /home/{user}/recordings/radioactive/
 filetype = mp3
+force_mp3 = false
 player = ffplay
 ```
 
@@ -264,7 +270,7 @@ player = ffplay
 
 ### Bonus Tips
 
-1. when using `rf`: you can force the recording to be in mp3 format by adding an extension to the file name. Example "talk-show.mp3". If you don't specify any extension it should auto-detect. Example "new_show"
+1. When using `rf`: you can force the recording to be in mp3 format by either adding the `.mp3` extension to the filename (e.g., "talk-show.mp3"), or by passing `--force-mp3`, or by setting `force_mp3 = true` in the config. If you don't specify any extension and don't force mp3, it will auto-detect (e.g., "new_show").
 
 2. You don't have to pass the exact option name, a portion of it will also work. for example `--sea` for `--search`, `--coun` for `--country`, `--lim` for `--limit`
 
