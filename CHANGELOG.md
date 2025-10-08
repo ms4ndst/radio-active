@@ -1,10 +1,12 @@
-## Unreleased
+## 2.9.2 - Unofficial branch release
 
 UI
+
 - Live panel: Combined Now Playing and input prompt into a single Rich Group rendered by Live. The prompt now appears directly below the station/song info inside the same panel.
 - Added helper `update_now_playing_prompt()` to update the prompt text and refresh the panel.
 
 Recording
+
 - Live UI pauses and shows "Recording…" with the full output path while recording; shows "Recording complete" after finishing.
 - Recording path normalization added; on Windows, invalid or non-creatable directories fall back to `%USERPROFILE%\Music\radioactive`.
 - ffmpeg invocation uses non-interactive flags (`-nostdin`, `-y`) to avoid hidden prompts blocking recording.
@@ -12,9 +14,11 @@ Recording
 - New config option `force_mp3` (default false) and CLI flag `--force-mp3` to always produce MP3 output.
 
 CLI/Config
+
 - Command-line parser and config loader updated to support `force_mp3` with correct defaults and precedence.
 
 Misc
+
 - Suppressed noisy `pkg_resources` deprecation warning originating from `pyradios` import during startup.
 
 ## 2.9.1
@@ -25,7 +29,6 @@ Misc
 4. Play/Pause player from runtime command `p`
 5. Default config file support added
 6. Fixed minor bugs while giving runtime commands
-
 
 ## 2.9.0
 
@@ -46,7 +49,6 @@ Misc
 4. Force a recording to be in mp3 format only.
 5. Simpler command help message
 
-
 ## 2.7.0
 
 1. Recording support added 🎉 . save recording as mp3 or wav 🎶 `--record`
@@ -56,7 +58,6 @@ Misc
 5. A caching mechanism was added for fewer API calls. Faster radio playbacks!
 6. Code refactored. It is easier for contributors to implement new features.
 7. BREAKING CHANGES: `--station` -> `--search`, `--discover-by-country` -> `--country`, `--discover-by-tag` -> `--tag`, `--discover-by-state` -> `--state`, `--discover-by-language` -> `--language`, `--add-station` -> `--add`, `--add-to-favorite` -> `--favorite`, `--show-favorite-list` -> `--list`
-
 
 ## 2.6.0
 
@@ -68,14 +69,11 @@ Misc
 6. Improved `ffplay` process handling by introducing a thread to monitor runtime errors from the process.
 7. `pyradios` module updated to latest version.
 
-
 ## 2.5.2
 
 1. Added `--kill` option to stop background radios if any.
 2. Project restructured.
 3. Fixed saving empty last station information.
-
-
 
 ## 2.5.1
 
@@ -141,7 +139,6 @@ Misc
 3. Formatted codebase
 4. Logging issued fixed
 5. Sentry Added to collect unhandled Exceptions logs only
-
 
 ## 2.1.2
 
