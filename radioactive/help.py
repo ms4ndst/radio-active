@@ -2,18 +2,16 @@ from os import path
 
 from rich.console import Console
 from rich.table import Table
+from radioactive.c64_theme import make_table, c64_console
 
 user = path.expanduser("~")
 
 
 def show_help():
     """Show help message as table"""
-    console = Console()
+    console = c64_console()
 
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Arguments", justify="left")
-    table.add_column("Description", justify="left")
-    table.add_column("Default", justify="center")
+    table = make_table(["Arguments", "Description", "Default"]) 
 
     table.add_row(
         "--search , -S",

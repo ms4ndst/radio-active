@@ -166,7 +166,8 @@ When running with the Live UI (default, including when using `--auto-track`), th
 
 
 > [!NOTE]
-> Once you save/play at least one station, invoking `radio` without any options will show a selection menu
+> Once you save/play at least one station, invoking `radio` without any options will show a selection menu.
+> During playback, press `w` to see your favorites inside the INFO panel; press a number to play it immediately.
 
 > `--search`, `-S`: Search for a station online.
 
@@ -195,12 +196,14 @@ Input a command during the radio playback to perform an action. Available comman
 ```
 Enter a command to perform an action: ?
 
-t/T/track: Current song name (track info)
-r/R/record: Record a station
-f/F/fav: Add station to favorite list
-rf/RF/recordfile: Specify a filename for the recording.
-h/H/help/?: Show this help message
-q/Q/quit: Quit radioactive
+p: Play/Pause current station
+i/info: Station information
+r/record: Record a station
+n: Record with custom filename
+f/fav: Add station to favorite list
+w/list: Show favorites inside INFO and select by number (no Enter needed)
+h/help/?: Show this help message
+q/quit: Quit radioactive
 ```
 
 ### Sort Parameters

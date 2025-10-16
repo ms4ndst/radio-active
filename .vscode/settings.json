@@ -18,7 +18,7 @@
     "files.autoSave": "off",
     "editor.wordWrap": "wordWrapColumn",
     "workbench.colorTheme": "GitHub Dark",
-    "editor.minimap.autohide": true,
+    "editor.minimap.autohide": "mouseover",
     "editor.minimap.renderCharacters": false,
     "editor.experimentalWhitespaceRendering": "font",
     "editor.fontFamily": "'Fira Code', Consolas, 'Courier New', monospace",

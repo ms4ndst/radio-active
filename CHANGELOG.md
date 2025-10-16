@@ -1,3 +1,19 @@
+## 2.9.3 - Interactive favorites and UI improvements
+
+UI
+
+- Permanent header added at the top; Now Playing panel stays in the middle; INFO panel below it.
+- Favorites (w) render inside the INFO panel with C64 theme.
+- Numeric, no-Enter selection for favorites inside INFO (multi-digit supported with short timeout).
+- Live view runs in alternate screen to avoid frame duplication; input prompt appears under Keys row.
+- Truecolor theme forced for consistent colors; improved compatibility with shell themes.
+- Removed t/track hotkey; track title auto-updates.
+
+Playback/Windows
+
+- Switching favorites updates the internal live worker URL so titles update after switching.
+- Safer atexit handling for Live stop; fewer stray logs; Windows path normalization for recordings.
+
 ## 2.9.2 - Unofficial branch release
 
 UI

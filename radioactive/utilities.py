@@ -7,8 +7,10 @@ import subprocess
 import sys
 from random import randint
 from time import sleep
+import time
 import threading
 import atexit
+import io
 
 import requests
 from pick import pick
@@ -19,6 +21,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from zenlog import log
+
+# C64-inspired UI helpers
+from radioactive.c64_theme import make_panel, make_table, c64_console, C64_WIDTH
 
 # Windows single-key support
 try:
@@ -51,8 +56,34 @@ _global_now_playing_station = ""
 _global_now_playing_title = ""
 _global_now_playing_hints = ""
 _global_now_playing_messages: list[str] = []
+# Current stream URL for the Live worker
+_global_now_playing_url = ""
+# Optional: a Rich renderable to show in INFO panel instead of plain text lines
+_global_info_renderable = None
 _global_now_playing_input_active = False
 _force_mp3_always = False
+
+
+def ui_info(message: str):
+    """Route info messages to the Live INFO panel when active, else log."""
+    try:
+        if _global_now_playing_live is not None:
+            set_info_text(message)
+        else:
+            log.info(message)
+    except Exception:
+        log.info(message)
+
+
+def ui_error(message: str):
+    """Route error messages to the Live INFO panel when active, else log."""
+    try:
+        if _global_now_playing_live is not None:
+            set_info_text(message)
+        else:
+            log.error(message)
+    except Exception:
+        log.error(message)
 
 
 def handle_fetch_song_title(url):
@@ -112,20 +143,30 @@ def get_song_title(url: str) -> str:
 
 
 def _make_now_playing_panel(station_name: str, track_title: str) -> Panel:
-    title = Text(station_name or "Unknown Station", style="bold cyan", justify="center")
+    title = Text(station_name or "Unknown Station", style="c64.title", justify="center")
     body = Text(f"🎶 {track_title or 'Fetching…'}", justify="center")
-    return Panel(body, title=title, width=85)
+    return make_panel(body, title=title, width=C64_WIDTH)
 
 
-def _make_now_playing_view(station_name: str, track_title: str, hints: str, messages: list[str]):
-    # Top: Now Playing panel
+def _make_header_panel() -> Panel:
+    head = Text("Play radios from your terminal — press h for help, q to quit", justify="center")
+    return make_panel(head, title="[c64.title]RADIO-ACTIVE (C64 EDITION)[/]", width=C64_WIDTH)
+
+
+def _make_now_playing_view(station_name: str, track_title: str, hints: str, messages):
+    # Header (always visible at top)
+    panel_head = _make_header_panel()
+    # Station panel
     panel_now = _make_now_playing_panel(station_name, track_title)
-    # Middle: Info panel
-    body = Text("\n".join(messages) if messages else "")
-    panel_info = Panel(body, title="[b]Info[/b]", width=85)
-    # Bottom: Keys
+    # Info panel below station
+    if _global_info_renderable is not None:
+        info_body = _global_info_renderable
+    else:
+        info_body = Text("\n".join(messages) if messages else "")
+    panel_info = make_panel(info_body, title="[c64.title]INFO[/]", width=C64_WIDTH)
+    # Keys row
     hints_text = Text.from_markup(hints) if hints else Text("")
-    return Group(panel_now, panel_info, hints_text)
+    return Group(panel_head, panel_now, panel_info, hints_text)
 
 
 def _update_live_view():
@@ -141,13 +182,15 @@ def _update_live_view():
 
 
 def set_info_text(text: str):
-    global _global_now_playing_messages
+    global _global_now_playing_messages, _global_info_renderable
+    _global_info_renderable = None
     _global_now_playing_messages = [text.rstrip("\n")] if text else []
     _update_live_view()
 
 
 def set_info_lines(lines: list[str]):
-    global _global_now_playing_messages
+    global _global_now_playing_messages, _global_info_renderable
+    _global_info_renderable = None
     _global_now_playing_messages = [l.rstrip("\n") for l in lines]
     _update_live_view()
 
@@ -155,29 +198,18 @@ def set_info_lines(lines: list[str]):
 def safe_input(prompt: str) -> str:
     """Prompt for input below the Live view (under the Keys row).
 
-    Uses a stop/start cycle for Rich Live (pause is not available in rich==14.x).
+    Keep Live running (especially in alternate screen) to preserve the view.
     """
     global _global_now_playing_live, _global_now_playing_input_active
     if _global_now_playing_live is not None:
         _global_now_playing_input_active = True
         try:
-            # Stop live rendering so the prompt can render beneath the Keys row
-            try:
-                _global_now_playing_live.stop()
-            except Exception:
-                pass
-            # print a separator newline and prompt
             try:
                 _global_now_playing_live.console.print("")
             except Exception:
                 pass
             value = _global_now_playing_live.console.input(prompt)
         finally:
-            # Restart live and restore the view
-            try:
-                _global_now_playing_live.start()
-            except Exception:
-                pass
             _global_now_playing_input_active = False
             _update_live_view()
         return value
@@ -190,44 +222,142 @@ def set_force_mp3(flag: bool):
     _force_mp3_always = bool(flag)
 
 
+def _quick_pick_index(max_n: int, timeout: float = 0.7) -> int | None:
+    """Capture numeric keys without Enter; supports multi-digit with a short timeout.
+    Returns 0-based index or None to cancel/invalid.
+    """
+    global _global_now_playing_input_active
+    _global_now_playing_input_active = True
+    buf = ""
+    last_ts = None
+    try:
+        while True:
+            ch = _get_single_key()
+            now = time.time()
+            if ch is None:
+                if buf and last_ts is not None and (now - last_ts) >= timeout:
+                    break
+                sleep(0.05)
+                continue
+            # cancel
+            if ch in ("q", "Q", "\x1b"):
+                buf = ""
+                break
+            # finalize
+            if ch in ("\r", "\n"):
+                break
+            # collect digits
+            if ch.isdigit():
+                if not buf and ch == "0":
+                    # ignore leading zero
+                    continue
+                buf += ch
+                last_ts = now
+                # if single-digit and within range, finalize immediately
+                try:
+                    val = int(buf)
+                    if 1 <= val <= max_n and max_n <= 9:
+                        break
+                except Exception:
+                    pass
+                continue
+            # any other key ends collection if we already have some digits
+            if buf:
+                break
+            # otherwise ignore
+    finally:
+        _global_now_playing_input_active = False
+    if not buf:
+        return None
+    try:
+        val = int(buf)
+        if 1 <= val <= max_n:
+            return val - 1
+    except Exception:
+        pass
+    return None
+
+
+def set_info_renderable(renderable):
+    global _global_info_renderable
+    _global_info_renderable = renderable
+    _update_live_view()
+
+
 def start_now_playing_live(station_name: str, target_url: str, interval_seconds: int = 15) -> Live:
     """Start Live UI and a background worker that updates song title."""
     global _global_now_playing_live, _global_now_playing_station, _global_now_playing_title
-    global _global_now_playing_hints, _global_now_playing_messages
+    global _global_now_playing_hints, _global_now_playing_messages, global_current_station_info, _global_now_playing_url
 
     _global_now_playing_station = station_name
     _global_now_playing_title = ""
-    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  t=Track  i=Info  r=Record  n=RecordFile  f=Fav  w=List  h=Help  q=Quit"
+    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  i=Info  r=Record  n=RecordFile  f=Fav  w=List  h=Help  q=Quit"
     _global_now_playing_messages = []
+    _global_now_playing_url = target_url or ""
 
+    # Ensure minimal station info is available for the Info panel
+    try:
+        global_current_station_info = {
+            "name": station_name or "Unknown Station",
+            "url": target_url or "",
+        }
+    except Exception:
+        pass
+
+    console = c64_console()
     live = Live(
-        _make_now_playing_view(_global_now_playing_station, _global_now_playing_title, _global_now_playing_hints, _global_now_playing_messages),
+        _make_now_playing_view(
+            _global_now_playing_station,
+            _global_now_playing_title,
+            _global_now_playing_hints,
+            _global_now_playing_messages,
+        ),
+        console=console,
         refresh_per_second=8,
-        screen=False,
+        screen=True,
         transient=False,
     )
     live.start()
     _global_now_playing_live = live
 
-    def _worker(url, interval):
-        global _global_now_playing_title, _global_now_playing_input_active
-        last = None
+    def _worker(interval):
+        global _global_now_playing_title, _global_now_playing_input_active, _global_now_playing_url
+        last_title = None
+        last_url = None
         while True:
             try:
                 if _global_now_playing_input_active:
                     sleep(0.1)
                     continue
+                url = _global_now_playing_url
+                if not url:
+                    sleep(interval)
+                    continue
+                if url != last_url:
+                    # reset title state when URL changes
+                    last_title = None
+                    _global_now_playing_title = ""
+                    _update_live_view()
+                    last_url = url
                 title = get_song_title(url)
-                if title and title != last:
+                if title and title != last_title:
                     _global_now_playing_title = title
                     _update_live_view()
-                    last = title
+                    last_title = title
             except Exception as e:
                 log.debug(f"live worker error: {e}")
             sleep(interval)
 
-    threading.Thread(target=_worker, args=(target_url, interval_seconds), daemon=True).start()
-    atexit.register(lambda: (_global_now_playing_live and _global_now_playing_live.stop()))
+    threading.Thread(target=_worker, args=(interval_seconds,), daemon=True).start()
+
+    def _stop_live():
+        try:
+            if _global_now_playing_live:
+                _global_now_playing_live.stop()
+        except Exception:
+            pass
+
+    atexit.register(_stop_live)
     return live
 
 
@@ -340,22 +470,19 @@ def handle_record(
 
 
 def handle_welcome_screen():
-    welcome = Panel(
+    welcome = make_panel(
         """
-        :radio: Play any radios around the globe right from this Terminal [yellow]:zap:[/yellow]!
-        :smile: Author: Dipankar Pal
-        :question: Type '--help' for more details on available commands
-        :bug: Visit: https://github.com/deep5050/radio-active to submit issues
-        :star: Show some love by starring the project on GitHub [red]:heart:[/red]
-        :dollar: You can donate me at https://deep5050.github.io/payme/
-        :x: Press Ctrl+C to quit
+        LOAD "RADIO-ACTIVE",8,1
+
+        Play radios around the globe right from your terminal.
+        Type '--help' for commands. Press Ctrl+C to quit.
+        Project: https://github.com/deep5050/radio-active
         """,
-        title="[b]RADIOACTIVE[/b]",
-        width=85,
-        expand=True,
-        safe_box=True,
+        title="[c64.title]RADIO-ACTIVE (C64 EDITION)[/]",
+        width=C64_WIDTH,
     )
-    print(welcome)
+    # Use themed console to avoid external theme overrides
+    c64_console().print(welcome)
 
 
 def handle_update_screen(app):
@@ -365,9 +492,9 @@ def handle_update_screen(app):
             + app.get_remote_version()
             + "[/italic][/green][/blink]\nSee the changes: https://github.com/deep5050/radio-active/blob/main/CHANGELOG.md"
         )
-        update_panel = Panel(
+        update_panel = make_panel(
             update_msg,
-            width=85,
+            width=C64_WIDTH,
         )
         print(update_panel)
     else:
@@ -375,46 +502,38 @@ def handle_update_screen(app):
 
 
 def handle_favorite_table(alias):
-    # log.info("Your favorite station list is below")
-    table = Table(
-        show_header=True,
-        header_style="bold magenta",
-        min_width=85,
-        safe_box=False,
-        expand=True,
-    )
-    table.add_column("Station", justify="left")
-    table.add_column("URL / UUID", justify="left")
+    # Render favorites inside the Live INFO panel
+    table = make_table(["Station", "URL / UUID"]) 
     if len(alias.alias_map) > 0:
         for entry in alias.alias_map:
             table.add_row(entry["name"], entry["uuid_or_url"])
-        # Render and replace Info panel
-        cap = Console(record=True, width=85)
-        cap.print(table)
-        set_info_text(cap.export_text())
-        log.info(f"Your favorite stations are saved in {alias.alias_path}")
+        set_info_renderable(table)
+        ui_info(f"Your favorite stations are saved in {alias.alias_path}")
     else:
-        log.info("You have no favorite station list")
+        set_info_lines(["You have no favorite station list"])
 
 
 def handle_show_station_info():
     """Show important information regarding the current station"""
     global global_current_station_info
-    custom_info = {}
     try:
-        custom_info["name"] = global_current_station_info["name"]
-        custom_info["uuid"] = global_current_station_info["stationuuid"]
-        custom_info["url"] = global_current_station_info["url"]
-        custom_info["website"] = global_current_station_info["homepage"]
-        custom_info["country"] = global_current_station_info["country"]
-        custom_info["language"] = global_current_station_info["language"]
-        custom_info["tags"] = global_current_station_info["tags"]
-        custom_info["codec"] = global_current_station_info["codec"]
-        custom_info["bitrate"] = global_current_station_info["bitrate"]
-        import json as _json
-        set_info_text(_json.dumps(custom_info, indent=2))
-    except:
-        log.error("No station information available")
+        info = {}
+        # Add fields if present
+        for k in ("name", "stationuuid", "url", "homepage", "country", "language", "tags", "codec", "bitrate"):
+            if isinstance(global_current_station_info, dict) and k in global_current_station_info and global_current_station_info.get(k) not in (None, ""):
+                # map key names for nicer labels
+                label = {
+                    "stationuuid": "uuid",
+                    "homepage": "website",
+                }.get(k, k)
+                info[label] = global_current_station_info.get(k)
+        if not info:
+            ui_error("No station information available")
+        else:
+            import json as _json
+            set_info_text(_json.dumps(info, indent=2))
+    except Exception:
+        ui_error("No station information available")
 
 
 def handle_add_station(alias):
@@ -609,6 +728,7 @@ class _PosixKeyReader:
 
 def _handle_keypress_loop_hotkeys(
     alias,
+    handler,
     player,
     target_url,
     station_name,
@@ -617,15 +737,12 @@ def _handle_keypress_loop_hotkeys(
     record_file,
     record_file_format,
     loglevel,
+    volume,
 ):
     def _handle(ch: str):
-        nonlocal record_file_format
+        nonlocal record_file_format, player, target_url, station_name, station_url
         if ch in ("p", "P"):
             player.toggle()
-        elif ch in ("t", "T"):
-            # show track title once
-            title = get_song_title(target_url)
-            set_info_text(title if title else "No track information available")
         elif ch in ("i", "I"):
             handle_show_station_info()
         elif ch in ("r", "R"):
@@ -692,12 +809,59 @@ def _handle_keypress_loop_hotkeys(
             handle_add_to_favorite(alias, station_name, station_url)
             set_info_text(f"Added to favorites: {station_name}")
         elif ch in ("w", "W"):
+            # Show favorites inside INFO with indices and prompt for selection
             alias.generate_map()
-            handle_favorite_table(alias)
+            if not alias.alias_map:
+                set_info_text("You have no favorite station list")
+                return
+            fav_table = Table(show_header=True, header_style="c64.title", expand=True, min_width=C64_WIDTH, box=None)
+            fav_table.add_column("ID", justify="right")
+            fav_table.add_column("Station", justify="left")
+            fav_table.add_column("URL / UUID", justify="left")
+            for i, entry in enumerate(alias.alias_map, start=1):
+                fav_table.add_row(str(i), entry["name"], entry["uuid_or_url"]) 
+            set_info_renderable(fav_table)
+            idx0 = _quick_pick_index(len(alias.alias_map))
+            if idx0 is None:
+                _update_live_view()
+                return
+            chosen = alias.alias_map[idx0]
+            chosen_name = chosen["name"].strip()
+            chosen_val = chosen["uuid_or_url"].strip()
+            # Resolve to URL if UUID
+            if "://" in chosen_val:
+                new_name, new_url = chosen_name, chosen_val
+            else:
+                new_name, new_url = handle_station_uuid_play(handler, chosen_val)
+            # Switch playback
+            try:
+                player.stop()
+            except Exception:
+                pass
+            try:
+                from radioactive.ffplay import Ffplay
+                if hasattr(player, "program_name") and getattr(player, "program_name", "") == "ffplay":
+                    player = Ffplay(new_url, volume, loglevel)
+                else:
+                    player.start(new_url)
+            except Exception as e:
+                set_info_text(f"Failed to start: {e}")
+                return
+            # Update current context and Live header and URL for worker
+            station_name = new_name
+            station_url = new_url
+            target_url = new_url
+            try:
+                global _global_now_playing_station, _global_now_playing_title, _global_now_playing_url
+                _global_now_playing_station = station_name
+                _global_now_playing_title = ""
+                _global_now_playing_url = new_url
+            except Exception:
+                pass
+            _update_live_view()
         elif ch in ("h", "H", "?"):
             set_info_lines([
                 "p: Play/Pause current station",
-                "t/track: Current track info",
                 "i/info: Station information",
                 "r/record: Record a station",
                 "n: Record with custom filename",
@@ -719,6 +883,7 @@ def _handle_keypress_loop_hotkeys(
 
 def handle_listen_keypress(
     alias,
+    handler,
     player,
     target_url,
     station_name,
@@ -727,10 +892,12 @@ def handle_listen_keypress(
     record_file,
     record_file_format,
     loglevel,
+    volume,
 ):
     # hotkey loop (cross-platform)
     return _handle_keypress_loop_hotkeys(
         alias,
+        handler,
         player,
         target_url,
         station_name,
@@ -739,13 +906,14 @@ def handle_listen_keypress(
         record_file,
         record_file_format,
         loglevel,
+        volume,
     )
 
 
 def handle_current_play_panel(curr_station_name=""):
     panel_station_name = Text(curr_station_name, justify="center")
 
-    station_panel = Panel(panel_station_name, title="[blink]:radio:[/blink]", width=85)
+    station_panel = make_panel(panel_station_name, title="[c64.title]:radio:[/]", width=C64_WIDTH)
     console = Console()
     console.print(station_panel)
 
