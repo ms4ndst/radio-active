@@ -1,15 +1,33 @@
 from setuptools import find_packages
 from setuptools import setup
 
-from radioactive.app import App
 import io
-
-app = App()
+import re
+from pathlib import Path
 
 DESCRIPTION = (
     "Play and record any radio stations around the globe right from the terminal"
 )
-VERSION = app.get_version()
+
+
+def get_version():
+    """Read the version string from radioactive/app.py without importing the package.
+
+    This avoids executing package code (which requires third-party deps like
+    `requests`) while pip is installing dependencies.
+    """
+    try:
+        p = Path(__file__).parent / "radioactive" / "app.py"
+        text = p.read_text(encoding="utf8")
+        m = re.search(r"__VERSION__\s*=\s*[\'\"]([^\'\"]+)[\'\"]", text)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return "0.0.0"
+
+
+VERSION = get_version()
 
 
 def readme():
