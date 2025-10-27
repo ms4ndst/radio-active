@@ -81,9 +81,7 @@ I recommend installing it using `pipx install radio-active`
 
 #### TODO:
 
-- [ ] Create deb, rpm and exe packages
-- [ ] Add it to various Linux distribution package repositories.
-- [ ] Add to scoop, chocolately
+- [ ] add theme support
 
 ### External Dependency
 
