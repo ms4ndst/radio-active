@@ -17,7 +17,7 @@
 </p>
 
 <p align=center>
-<img align=center src=https://user-images.githubusercontent.com/27947066/271250790-291c02fa-e568-45c8-8097-72167a109b82.png  width=550px>
+<img align=center src=https://github.com/ms4ndst/radio-active/blob/main/images/main%20gui.png  width=550px>
 <hr>
 <img alt="GitHub" src="https://img.shields.io/github/license/deep5050/radio-active?style=for-the-badge">
 <img alt="PyPI" src="https://img.shields.io/pypi/v/radio-active?style=for-the-badge">
