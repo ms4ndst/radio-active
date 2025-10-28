@@ -138,6 +138,22 @@ When running with the Live UI (default, including when using `--auto-track`), th
   - one-dark-pro, dracula, solarized-dark, nord, monokai, github-dark
   - material-darker, night-owl, ayu-dark, tokyo-night
 
+### What's New since 2.9.2
+
+- 2.10.0
+  - Theme system with in-app Theme chooser (press `t` in playback; choose by number).
+  - 13 themes available (classic, gruvbox-dark, catppuccin-mocha, one-dark-pro, dracula, solarized-dark, nord, monokai, github-dark, material-darker, night-owl, ayu-dark, tokyo-night).
+  - Tooltip/hints row adopts the active theme colors.
+  - INFO panel is cleared after selecting a theme or switching to a favorite for a cleaner view.
+- 2.9.3
+  - Live layout improvements: persistent header, Now Playing panel, INFO panel below.
+  - Favorites (`w`) render inside the INFO panel with numeric selection (no Enter needed; multi-digit supported).
+  - Auto-updating track titles; fewer stray logs; improved Windows path handling for recordings.
+- 2.9.2
+  - Live UI prompt appears inside the Live panel below Now Playing, so you can type without losing the view.
+  - Recording UX: INFO shows “Recording…” with full path, then “Recording complete”.
+  - New `--force-mp3` flag and matching `force_mp3` config; safer codec autodetect.
+
 ### Options
 
 
