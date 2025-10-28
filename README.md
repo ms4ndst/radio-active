@@ -83,7 +83,6 @@ I recommend installing it using `pipx install radio-active`
 
 #### TODO:
 
-- [ ] add theme support
 
 ### External Dependency
 
