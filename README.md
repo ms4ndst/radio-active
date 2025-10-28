@@ -43,6 +43,8 @@
 - [x] Saves last station information
 - [x] Favorite stations :heart:
 - [x] Selection menu for favorite stations
+- [x] Theme chooser with multiple color themes (Classic, Gruvbox, Catppuccin, One Dark Pro, Dracula, Solarized, Nord, Monokai, GitHub Dark, Material, Night Owl, Ayu, Tokyo Night)
+- [x] Live UI hints/tooltip match the active theme colors
 - [x] Supports user-added stations :wrench:
 - [x] Looks minimal and user-friendly
 - [x] Runs on Raspberry Pi
@@ -129,6 +131,15 @@ Search a station with `radio --search [STATION_NAME]` or simply `radio` :zap: to
 
 When running with the Live UI (default, including when using `--auto-track`), the input prompt is rendered inside the Live panel, directly below the Now Playing info. You can type commands immediately without losing the panel.
 
+### Themes
+
+- Press `t` during playback to open the Theme chooser inside the INFO window. Select by number to apply instantly.
+- The tooltip/hints row automatically adopts the active theme’s colors.
+- Available themes:
+  - classic (default), gruvbox-dark, catppuccin-mocha
+  - one-dark-pro, dracula, solarized-dark, nord, monokai, github-dark
+  - material-darker, night-owl, ayu-dark, tokyo-night
+
 ### Options
 
 
@@ -202,6 +213,7 @@ r/record: Record a station
 n: Record with custom filename
 f/fav: Add station to favorite list
 w/list: Show favorites inside INFO and select by number (no Enter needed)
+t/theme: Theme chooser (applies instantly, hints recolor)
 h/help/?: Show this help message
 q/quit: Quit radioactive
 ```

@@ -23,7 +23,7 @@ from rich.text import Text
 from zenlog import log
 
 # C64-inspired UI helpers
-from radioactive.c64_theme import make_panel, make_table, c64_console, C64_WIDTH
+from radioactive.c64_theme import make_panel, make_table, themed_console, C64_WIDTH, available_themes, apply_theme, get_active_theme_name, active_style
 
 # Windows single-key support
 try:
@@ -143,14 +143,14 @@ def get_song_title(url: str) -> str:
 
 
 def _make_now_playing_panel(station_name: str, track_title: str) -> Panel:
-    title = Text(station_name or "Unknown Station", style="c64.title", justify="center")
+    title = Text(station_name or "Unknown Station", style="ui.title", justify="center")
     body = Text(f"🎶 {track_title or 'Fetching…'}", justify="center")
     return make_panel(body, title=title, width=C64_WIDTH)
 
 
 def _make_header_panel() -> Panel:
     head = Text("Play radios from your terminal — press h for help, q to quit", justify="center")
-    return make_panel(head, title="[c64.title]RADIO-ACTIVE (C64 EDITION)[/]", width=C64_WIDTH)
+    return make_panel(head, title="[ui.title]RADIO-ACTIVE[/]", width=C64_WIDTH)
 
 
 def _make_now_playing_view(station_name: str, track_title: str, hints: str, messages):
@@ -163,9 +163,13 @@ def _make_now_playing_view(station_name: str, track_title: str, hints: str, mess
         info_body = _global_info_renderable
     else:
         info_body = Text("\n".join(messages) if messages else "")
-    panel_info = make_panel(info_body, title="[c64.title]INFO[/]", width=C64_WIDTH)
+    panel_info = make_panel(info_body, title="[ui.title]INFO[/]", width=C64_WIDTH)
     # Keys row
-    hints_text = Text.from_markup(hints) if hints else Text("")
+    # Hints styled to match active theme colors
+    if hints:
+        hints_text = Text.from_markup(hints, style=active_style())
+    else:
+        hints_text = Text("", style=active_style())
     return Group(panel_head, panel_now, panel_info, hints_text)
 
 
@@ -291,7 +295,7 @@ def start_now_playing_live(station_name: str, target_url: str, interval_seconds:
 
     _global_now_playing_station = station_name
     _global_now_playing_title = ""
-    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  i=Info  r=Record  n=RecordFile  f=Fav  w=List  h=Help  q=Quit"
+    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  i=Info  r=Record  n=RecordFile  f=Fav  w=List  t=Theme  h=Help  q=Quit"
     _global_now_playing_messages = []
     _global_now_playing_url = target_url or ""
 
@@ -304,7 +308,7 @@ def start_now_playing_live(station_name: str, target_url: str, interval_seconds:
     except Exception:
         pass
 
-    console = c64_console()
+    console = themed_console()
     live = Live(
         _make_now_playing_view(
             _global_now_playing_station,
@@ -478,11 +482,11 @@ def handle_welcome_screen():
         Type '--help' for commands. Press Ctrl+C to quit.
         Project: https://github.com/deep5050/radio-active
         """,
-        title="[c64.title]RADIO-ACTIVE (C64 EDITION)[/]",
+        title="[ui.title]RADIO-ACTIVE[/]",
         width=C64_WIDTH,
     )
     # Use themed console to avoid external theme overrides
-    c64_console().print(welcome)
+    themed_console().print(welcome)
 
 
 def handle_update_screen(app):
@@ -814,7 +818,7 @@ def _handle_keypress_loop_hotkeys(
             if not alias.alias_map:
                 set_info_text("You have no favorite station list")
                 return
-            fav_table = Table(show_header=True, header_style="c64.title", expand=True, min_width=C64_WIDTH, box=None)
+            fav_table = Table(show_header=True, header_style="ui.title", expand=True, min_width=C64_WIDTH, box=None)
             fav_table.add_column("ID", justify="right")
             fav_table.add_column("Station", justify="left")
             fav_table.add_column("URL / UUID", justify="left")
@@ -859,6 +863,34 @@ def _handle_keypress_loop_hotkeys(
             except Exception:
                 pass
             _update_live_view()
+            set_info_lines([])
+            _update_live_view()
+        elif ch in ("t", "T"):
+            # Theme chooser inside INFO panel
+            names = available_themes()
+            theme_table = Table(show_header=True, header_style="ui.title", expand=True, min_width=C64_WIDTH, box=None)
+            theme_table.add_column("ID", justify="right")
+            theme_table.add_column("Theme", justify="left")
+            current = get_active_theme_name()
+            for i, name in enumerate(names, start=1):
+                label = f"{name} [dim](current)[/]" if name == current else name
+                theme_table.add_row(str(i), label)
+            set_info_renderable(theme_table)
+            idx0 = _quick_pick_index(len(names))
+            if idx0 is None:
+                _update_live_view()
+                return
+            chosen = names[idx0]
+            # Apply theme to the live console and re-render, then clear INFO
+            try:
+                if _global_now_playing_live and _global_now_playing_live.console:
+                    apply_theme(chosen, console=_global_now_playing_live.console)
+                else:
+                    apply_theme(chosen, console=None)
+            except Exception:
+                apply_theme(chosen, console=None)
+            set_info_lines([])
+            _update_live_view()
         elif ch in ("h", "H", "?"):
             set_info_lines([
                 "p: Play/Pause current station",
@@ -866,6 +898,8 @@ def _handle_keypress_loop_hotkeys(
                 "r/record: Record a station",
                 "n: Record with custom filename",
                 "f/fav: Add station to favorite list",
+                "w/list: Show favorites and select",
+                "t/theme: Theme chooser",
                 "h/help/?: Show this help message",
                 "q/quit: Quit radioactive",
             ])
@@ -913,7 +947,7 @@ def handle_listen_keypress(
 def handle_current_play_panel(curr_station_name=""):
     panel_station_name = Text(curr_station_name, justify="center")
 
-    station_panel = make_panel(panel_station_name, title="[c64.title]:radio:[/]", width=C64_WIDTH)
+    station_panel = make_panel(panel_station_name, title="[ui.title]:radio:[/]", width=C64_WIDTH)
     console = Console()
     console.print(station_panel)
 

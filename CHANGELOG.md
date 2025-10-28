@@ -1,9 +1,18 @@
+## 2.10.0 - Theme system and chooser in INFO panel
+
+UI/Themes
+
+- New theme system with a Theme chooser in the INFO window (press `t`).
+- Added themes: c64 (default), gruvbox-dark, catppuccin-mocha, one-dark-pro, dracula, solarized-dark, nord, monokai, github-dark, material-darker, night-owl, ayu-dark, tokyo-night.
+- Tooltip/hints row now matches the active theme colors.
+- INFO panel clears after selecting a theme or switching to a favorite station for a cleaner view.
+
 ## 2.9.3 - Interactive favorites and UI improvements
 
 UI
 
 - Permanent header added at the top; Now Playing panel stays in the middle; INFO panel below it.
-- Favorites (w) render inside the INFO panel with C64 theme.
+- Favorites (w) render inside the INFO panel with the active theme.
 - Numeric, no-Enter selection for favorites inside INFO (multi-digit supported with short timeout).
 - Live view runs in alternate screen to avoid frame duplication; input prompt appears under Keys row.
 - Truecolor theme forced for consistent colors; improved compatibility with shell themes.
