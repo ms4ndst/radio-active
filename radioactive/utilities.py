@@ -24,6 +24,7 @@ from zenlog import log
 
 # C64-inspired UI helpers
 from radioactive.c64_theme import make_panel, make_table, themed_console, C64_WIDTH, available_themes, apply_theme, get_active_theme_name, active_style
+from radioactive.config import Configs
 
 # Windows single-key support
 try:
@@ -889,6 +890,11 @@ def _handle_keypress_loop_hotkeys(
                     apply_theme(chosen, console=None)
             except Exception:
                 apply_theme(chosen, console=None)
+            # Persist the theme selection
+            try:
+                Configs().set_theme(chosen)
+            except Exception:
+                pass
             set_info_lines([])
             _update_live_view()
         elif ch in ("h", "H", "?"):

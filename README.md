@@ -292,6 +292,7 @@ filepath = /home/{user}/recordings/radioactive/
 filetype = mp3
 force_mp3 = false
 player = ffplay
+theme = classic
 ```
 
 > [!WARNING]

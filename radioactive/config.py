@@ -23,6 +23,7 @@ def write_a_sample_config_file():
         "filetype": "mp3",
         "player": "ffplay",
         "force_mp3": "false",
+        "theme": "classic",
     }
 
     # Get the user's home directory
@@ -67,6 +68,11 @@ class Configs:
             )
             options["filetype"] = self.config.get("AppConfig", "filetype")
             options["player"] = self.config.get("AppConfig", "player")
+            # Theme name for UI
+            try:
+                options["theme"] = self.config.get("AppConfig", "theme", fallback="classic")
+            except Exception:
+                options["theme"] = "classic"
             # Optional: always force mp3 when recording
             try:
                 force_val = self.config.get("AppConfig", "force_mp3", fallback="false")
@@ -82,3 +88,18 @@ class Configs:
             write_a_sample_config_file()
             log.info("Re-run radioative")
             sys.exit(1)
+
+    def set_theme(self, theme_name: str) -> bool:
+        """Persist theme under AppConfig.theme; create file if needed."""
+        try:
+            cfg = configparser.ConfigParser()
+            if os.path.exists(self.config_path):
+                cfg.read(self.config_path)
+            if "AppConfig" not in cfg:
+                cfg["AppConfig"] = {}
+            cfg["AppConfig"]["theme"] = str(theme_name)
+            with open(self.config_path, "w") as f:
+                cfg.write(f)
+            return True
+        except Exception:
+            return False

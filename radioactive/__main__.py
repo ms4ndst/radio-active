@@ -124,6 +124,16 @@ def main():
 
     VERSION = app.get_version()
 
+    # Apply persisted UI theme before starting Live console
+    try:
+        from radioactive.config import Configs
+        from radioactive.c64_theme import apply_theme
+        cfg = Configs().load()
+        theme_name = (cfg or {}).get("theme", "classic")
+        apply_theme(theme_name)
+    except Exception:
+        pass
+
     handler = Handler()
     alias = Alias()
     alias.generate_map()
