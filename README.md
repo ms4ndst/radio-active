@@ -271,7 +271,7 @@ theme = classic
 
 ### Bonus Tips
 
-1. When using `rf`: you can force the recording to be in mp3 format by either adding the `.mp3` extension to the filename (e.g., "talk-show.mp3"), or by passing `--force-mp3`, or by setting `force_mp3 = true` in the config. If you don't specify any extension and don't force mp3, it will auto-detect (e.g., "new_show").
+1. Recording format: all recordings are saved as MP3 by default (libmp3lame). Just enter a filename without any extension (e.g., "talk-show"), and the app will save it as "talk-show.mp3". Supplying another extension is not necessary and will still result in an MP3 file.
 
 2. You don't have to pass the exact option name, a portion of it will also work. for example `--sea` for `--search`, `--coun` for `--country`, `--lim` for `--limit`
 
