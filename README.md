@@ -283,7 +283,7 @@ see [CHANGELOG](./CHANGELOG.md)
 
 ### Community
 
-Share you favorite list with our community 🌐 ➡️ [Here](https://github.com/deep5050/radio-active/discussions/10)
+Share you favorite list with  community 🌐 ➡️ [Here](https://github.com/deep5050/radio-active/discussions/10)
 
 > Your favorite list `.radio-active-alias` is under your home directory as a hidden file :)
 
