@@ -60,7 +60,7 @@ cd radio-active
 python -m pip install --user -e .
 ```
 
-Linux (virtual environment):
+Debian based Linux (virtual environment):
 ```
 # Install venv tools (Debian/Ubuntu)
 sudo apt-get update && sudo apt-get install -y python3-venv
