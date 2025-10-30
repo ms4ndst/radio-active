@@ -19,15 +19,7 @@
 <p align=center>
 <img align=center src=https://github.com/ms4ndst/radio-active/blob/main/images/main%20gui.png  width=550px>
 <hr>
-<img alt="GitHub" src="https://img.shields.io/github/license/deep5050/radio-active?style=for-the-badge">
-<img alt="PyPI" src="https://img.shields.io/pypi/v/radio-active?style=for-the-badge">
-<img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/radio-active?style=for-the-badge">
-<img alt="CodeFactor Grade" src="https://img.shields.io/codefactor/grade/github/deep5050/radio-active/main?style=for-the-badge">
-<a href=https://discord.gg/53rfebFyqK><img alt="Discord" src="https://img.shields.io/discord/847703568949051392?style=for-the-badge"></a>
-</p>
 
-<p align=center> <a href=https://www.youtube.com/watch?v=X-NfK5XbM90><img alt="YouTube Video Likes and Dislikes" src="https://img.shields.io/youtube/likes/X-NfK5XbM90?style=social&withDislikes"></a></p>
-<p align=center> <a href=https://discord.gg/53rfebFyqK> Join Discord Server </a></p>
 
 </div>
 
