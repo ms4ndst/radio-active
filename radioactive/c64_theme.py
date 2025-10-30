@@ -4,6 +4,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
+import shutil
 
 # Theme registry and active palette
 C64_WIDTH = 85
@@ -228,10 +229,20 @@ def apply_theme(name: str, console: Console | None = None):
             pass
 
 
-def themed_console(width: int = C64_WIDTH, record: bool = False, file=None) -> Console:
+def get_ui_width() -> int:
+    try:
+        cols = shutil.get_terminal_size(fallback=(C64_WIDTH, 24)).columns
+        # keep within sensible bounds
+        return max(85, min(cols - 2, 120))
+    except Exception:
+        return C64_WIDTH
+
+
+def themed_console(width: int | None = None, record: bool = False, file=None) -> Console:
+    # Let Rich use the terminal width by default
     return Console(
         theme=_theme,
-        width=width,
+        width=width,  # None -> auto
         record=record,
         file=file,
         force_terminal=True,
@@ -242,9 +253,10 @@ def themed_console(width: int = C64_WIDTH, record: bool = False, file=None) -> C
 c64_console = themed_console
 
 
-def make_panel(body, title: str = "", width: int = C64_WIDTH) -> Panel:
+def make_panel(body, title: str = "", width: int | None = None) -> Panel:
     # Accept any Rich renderable; coerce only plain strings
     content = body if isinstance(body, Text) or not isinstance(body, str) else Text(body)
+    width = width or get_ui_width()
     return Panel(
         content,
         title=title,
@@ -258,10 +270,11 @@ def make_panel(body, title: str = "", width: int = C64_WIDTH) -> Panel:
 
 
 def make_table(headers: list[str], widths: list[int] | None = None) -> Table:
+    width = get_ui_width()
     table = Table(
         show_header=True,
         header_style="ui.title",
-        min_width=C64_WIDTH,
+        min_width=width,
         expand=True,
         box=box.HEAVY,
         border_style=_ACTIVE_BORDER,

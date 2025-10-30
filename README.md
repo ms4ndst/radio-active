@@ -62,18 +62,12 @@
 
 While there are various CLI-based radio players like [PyRadio](https://github.com/coderholic/pyradio) and [TERA](https://github.com/shinokada/tera), Radioactive stands out for its simplicity. It's designed to work seamlessly right from the start. You don't need to be a hardcore Linux or Vim expert to enjoy radio stations with Radioactive. The goal of Radioactive is to offer a straightforward user interface that's easy to grasp and comes preconfigured, without unnecessary complexities.
 
-### In the Spotlight
+### Credits
 
-The praise from YouTube channels and blogs underscores Radioactive's emergence as a top choice for radio enthusiasts. Its simple yet powerful features, make it a must-try application for radio lovers of all expertise levels. Discover the world of radio with ease – experience Radioactive today.
+This project is a maintained fork of Radio-Active created by Dipankar Pal (deep5050). Huge credit to the original author and contributors for building the foundation.
 
-1. See DistroTube YouTube channel talks about my app: https://www.youtube.com/watch?v=H7sf1RDFXpU&pp=ygUYcmFkaW9hY3RpdmUgcGxheWVyIHJhZGlv
-2. Ubunlog: https://ubunlog.com/en/radio-activate-an-application-to-listen-to-the-radio-from-the-terminal/
-3. LinuxLinks: https://www.linuxlinks.com/radio-active-listen-radio-terminal/3/
-4. Official entry in the RadioBrowser API: [https://www.radio-browser.info/users](https://www.radio-browser.info/users#:~:text=Sources-,radio%2Dactive,-Sources)
-5. ThingsAndStuff: https://wiki.thingsandstuff.org/Streaming#:~:text=com/billniakas/bash_radio_gr-,radio%2Dactive,-https%3A//github.com
-6. Awesome-stars: https://arbal.github.io/awesome-stars/#:~:text=deep5050/radio%2Dactive%20%2D%20Play%20any%20radios%20around%20the%20globe%20right%20from%20the%20terminal%20%3Azap%3A
-7. OpenSourceAgenda: https://www.opensourceagenda.com/projects/my-awesome-stars#:~:text=deep5050/radio%2Dactive%20%2D%20Play%20any%20radios%20around%20the%20globe%20right%20from%20the%20terminal%20%3Azap%3A
-
+- Original project: https://github.com/deep5050/radio-active
+- This fork focuses on an enhanced Live UI, theming, dynamic width, and improved recording UX while keeping the CLI workflow familiar.
 
 ### Install
 
@@ -139,6 +133,11 @@ When running with the Live UI (default, including when using `--auto-track`), th
 
 ### What's New since 2.9.2
 
+- 2.10.1
+  - Recording runs in background; press `r` again to stop. INFO shows progress (elapsed, size, bitrate, speed).
+  - Filename prompt (`n`) appears inside the INFO window.
+  - Panels and keys row auto-size to terminal width (keeps shortcuts on one line).
+  - Theme choice is persisted to the config and applied at startup.
 - 2.10.0
   - Theme system with in-app Theme chooser (press `t` in playback; choose by number).
   - 13 themes available (classic, gruvbox-dark, catppuccin-mocha, one-dark-pro, dracula, solarized-dark, nord, monokai, github-dark, material-darker, night-owl, ayu-dark, tokyo-night).
@@ -222,8 +221,8 @@ Enter a command to perform an action: ?
 
 p: Play/Pause current station
 i/info: Station information
-r/record: Record a station
-n: Record with custom filename
+r/record: Start/Stop recording (background; progress shown in INFO)
+n: Record with custom filename (prompt inside INFO)
 f/fav: Add station to favorite list
 w/list: Show favorites inside INFO and select by number (no Enter needed)
 t/theme: Theme chooser (applies instantly, hints recolor)

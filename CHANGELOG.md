@@ -1,3 +1,20 @@
+## 2.10.1 - Recording progress, INFO input, dynamic width
+
+UI/Recording
+
+- Recording now runs in the background; press `r` again to stop.
+- Live INFO shows progress during recording (elapsed, size, bitrate, speed).
+- Filename prompt for `n` is shown inside the INFO window.
+- Suppressed ffmpeg output so the UI stays clean during recording.
+
+UI/Layout
+
+- Panels and the Keys row auto-size to terminal width (within 85–120 columns) so shortcuts remain on one line.
+
+Persistence
+
+- Last selected theme is saved to the config (`theme = <name>`) and loaded on startup.
+
 ## 2.10.0 - Theme system and chooser in INFO panel
 
 UI/Themes

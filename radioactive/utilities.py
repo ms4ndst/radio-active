@@ -44,7 +44,7 @@ except Exception:
 
 from radioactive.ffplay import kill_background_ffplays
 from radioactive.last_station import Last_station
-from radioactive.recorder import record_audio_auto_codec, record_audio_from_url
+from radioactive.recorder import record_audio_auto_codec, record_audio_from_url, start_recording_process, stop_recording_process
 
 RED_COLOR = "\033[91m"
 END_COLOR = "\033[0m"
@@ -63,6 +63,10 @@ _global_now_playing_url = ""
 _global_info_renderable = None
 _global_now_playing_input_active = False
 _force_mp3_always = False
+# Recording state
+_rec_proc = None
+_rec_outfile = ""
+_rec_thread = None
 
 
 def ui_info(message: str):
@@ -146,12 +150,12 @@ def get_song_title(url: str) -> str:
 def _make_now_playing_panel(station_name: str, track_title: str) -> Panel:
     title = Text(station_name or "Unknown Station", style="ui.title", justify="center")
     body = Text(f"🎶 {track_title or 'Fetching…'}", justify="center")
-    return make_panel(body, title=title, width=C64_WIDTH)
+    return make_panel(body, title=title)
 
 
 def _make_header_panel() -> Panel:
     head = Text("Play radios from your terminal — press h for help, q to quit", justify="center")
-    return make_panel(head, title="[ui.title]RADIO-ACTIVE[/]", width=C64_WIDTH)
+    return make_panel(head, title="[ui.title]RADIO-ACTIVE[/]")
 
 
 def _make_now_playing_view(station_name: str, track_title: str, hints: str, messages):
@@ -164,7 +168,7 @@ def _make_now_playing_view(station_name: str, track_title: str, hints: str, mess
         info_body = _global_info_renderable
     else:
         info_body = Text("\n".join(messages) if messages else "")
-    panel_info = make_panel(info_body, title="[ui.title]INFO[/]", width=C64_WIDTH)
+    panel_info = make_panel(info_body, title="[ui.title]INFO[/]")
     # Keys row
     # Hints styled to match active theme colors
     if hints:
@@ -289,6 +293,42 @@ def set_info_renderable(renderable):
     _update_live_view()
 
 
+def info_text_input(prompt: str, default: str = "") -> str | None:
+    """Capture text input inside the INFO window using single-key reads.
+
+    Esc cancels (returns None). Enter accepts. Backspace edits.
+    """
+    global _global_now_playing_input_active
+    buf = list(default)
+    _global_now_playing_input_active = True
+    try:
+        while True:
+            display = f"{prompt}{''.join(buf)}\n[dim]Enter=OK  Esc=Cancel  Backspace=Delete[/]"
+            set_info_text(display)
+            ch = _get_single_key()
+            if ch is None:
+                sleep(0.05)
+                continue
+            # finalize/cancel
+            if ch in ("\r", "\n"):
+                return "".join(buf)
+            if ch == "\x1b":
+                return None
+            # backspace on Win/Posix
+            if ch in ("\x08", "\x7f"):
+                if buf:
+                    buf.pop()
+                continue
+            # ignore control chars
+            if ord(ch) < 32:
+                continue
+            # append normal char
+            buf.append(ch)
+    finally:
+        _global_now_playing_input_active = False
+        _update_live_view()
+
+
 def start_now_playing_live(station_name: str, target_url: str, interval_seconds: int = 15) -> Live:
     """Start Live UI and a background worker that updates song title."""
     global _global_now_playing_live, _global_now_playing_station, _global_now_playing_title
@@ -400,7 +440,18 @@ def handle_record(
     record_file_format,  # auto/mp3
     loglevel,
 ):
-    log.info("Press 'q' to stop recording")
+    global _rec_proc, _rec_outfile
+    # Toggle: if already recording, stop
+    try:
+        if _rec_proc is not None and _rec_proc.poll() is None:
+            stop_recording_process(_rec_proc)
+            _rec_proc = None
+            ui_info(f"Recording stopped: {_rec_outfile}")
+            return
+    except Exception:
+        pass
+
+    # Show toggle hint in INFO instead of logging to terminal
     force_mp3 = False
     if _force_mp3_always:
         force_mp3 = True
@@ -459,19 +510,60 @@ def handle_record(
     tmp_filename = f"{record_file}.{record_file_format}"
     outfile_path = os.path.join(record_file_path, tmp_filename)
 
-    log.info(f"Recording will be saved as: \n{outfile_path}")
-    # Update Info panel with one-line status before and after
+    # Start recorder in background and update INFO (no external logging)
     try:
-        set_info_text(f"Recording… to: {outfile_path}")
+        set_info_text(f"Recording… to: {outfile_path}\n[dim]Press r again to stop[/]")
     except Exception:
         pass
 
-    record_audio_from_url(target_url, outfile_path, force_mp3, loglevel)
+    _rec_proc = start_recording_process(target_url, outfile_path, force_mp3, loglevel)
+    _rec_outfile = outfile_path
+    if _rec_proc is None:
+        ui_error("Failed to start recording")
+        return
 
-    try:
-        set_info_text(f"Recording complete: {outfile_path}")
-    except Exception:
-        pass
+    # Start a progress watcher thread to update INFO
+    def _watch():
+        buf = {}
+        try:
+            while _rec_proc and _rec_proc.poll() is None:
+                line = _rec_proc.stdout.readline()
+                if not line:
+                    sleep(0.1)
+                    continue
+                line = line.strip()
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    buf[k] = v
+                    if k == "progress":
+                        # emit an update on each progress marker
+                        elapsed = buf.get("out_time", "")
+                        try:
+                            size_b = int(buf.get("total_size", "0"))
+                        except Exception:
+                            size_b = 0
+                        if size_b >= 1024 * 1024:
+                            size_str = f"{size_b/1024/1024:.1f} MiB"
+                        elif size_b >= 1024:
+                            size_str = f"{size_b/1024:.0f} KiB"
+                        else:
+                            size_str = f"{size_b} B"
+                        br = buf.get("bitrate", "")
+                        sp = buf.get("speed", "")
+                        try:
+                            set_info_text(
+                                f"Recording… to: {outfile_path}\nelapsed={elapsed}  size={size_str}  bitrate={br}  speed={sp}\n[dim]Press r again to stop[/]"
+                            )
+                        except Exception:
+                            pass
+                        buf.clear()
+        except Exception:
+            pass
+
+    import threading as _threading
+
+    _rec_thread = _threading.Thread(target=_watch, daemon=True)
+    _rec_thread.start()
 
 
 def handle_welcome_screen():
@@ -751,12 +843,7 @@ def _handle_keypress_loop_hotkeys(
         elif ch in ("i", "I"):
             handle_show_station_info()
         elif ch in ("r", "R"):
-            # Stop live, run recording, then restart live
-            if _global_now_playing_live:
-                try:
-                    _global_now_playing_live.stop()
-                except Exception:
-                    pass
+            # Keep Live UI running during recording
             handle_record(
                 target_url,
                 station_name,
@@ -765,18 +852,13 @@ def _handle_keypress_loop_hotkeys(
                 record_file_format,
                 loglevel,
             )
-            if _global_now_playing_live:
-                try:
-                    _global_now_playing_live.start()
-                except Exception:
-                    pass
-                _update_live_view()
         elif ch in ("n", "N"):
             default_name = _default_record_filename(station_name)
-            try:
-                fname = safe_input(f"Enter output filename [default: {default_name}]: ")
-            except EOFError:
-                fname = ""
+            # Input inside INFO panel
+            fname = info_text_input(f"Enter output filename [default: {default_name}]: ", default="")
+            if fname is None:
+                _update_live_view()
+                return
             if not fname.strip():
                 file_name = default_name
                 rec_fmt = record_file_format
@@ -791,11 +873,7 @@ def _handle_keypress_loop_hotkeys(
                         log.warning("Do not provide any extension to autodetect the codec.")
                 except Exception:
                     file_name = fname
-            if _global_now_playing_live:
-                try:
-                    _global_now_playing_live.stop()
-                except Exception:
-                    pass
+            # Keep Live UI running during recording
             handle_record(
                 target_url,
                 station_name,
@@ -804,12 +882,6 @@ def _handle_keypress_loop_hotkeys(
                 rec_fmt,
                 loglevel,
             )
-            if _global_now_playing_live:
-                try:
-                    _global_now_playing_live.start()
-                except Exception:
-                    pass
-                _update_live_view()
         elif ch in ("f", "F"):
             handle_add_to_favorite(alias, station_name, station_url)
             set_info_text(f"Added to favorites: {station_name}")
@@ -953,7 +1025,7 @@ def handle_listen_keypress(
 def handle_current_play_panel(curr_station_name=""):
     panel_station_name = Text(curr_station_name, justify="center")
 
-    station_panel = make_panel(panel_station_name, title="[ui.title]:radio:[/]", width=C64_WIDTH)
+    station_panel = make_panel(panel_station_name, title="[ui.title]:radio:[/]")
     console = Console()
     console.print(station_panel)
 

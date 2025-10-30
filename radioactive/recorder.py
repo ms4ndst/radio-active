@@ -32,48 +32,68 @@ def record_audio_auto_codec(input_stream_url):
 
 
 def record_audio_from_url(input_url, output_file, force_mp3, loglevel):
+    """Deprecated: use start_recording_process instead (non-blocking)."""
+    proc = start_recording_process(input_url, output_file, force_mp3, loglevel)
+    if proc is None:
+        log.error("Failed to start recorder")
+        return
+    proc.wait()
+    log.info("Audio recorded successfully.")
+
+
+def _build_ffmpeg_cmd(input_url, output_file, force_mp3, loglevel):
+    cmd = [
+        "ffmpeg",
+        "-nostdin",      # no interactive stdin
+        "-y",            # overwrite if exists
+        "-i", input_url,
+        "-vn",           # audio only
+        # progress output to stdout (key=value lines)
+        "-progress", "pipe:1",
+        "-stats_period", "1",
+    ]
+    # codec
+    cmd += ["-c:a", "libmp3lame" if force_mp3 else "copy"]
+    # quiet unless debug
+    if loglevel == "debug":
+        cmd += ["-loglevel", "info"]
+    else:
+        cmd += ["-loglevel", "error", "-hide_banner"]
+    cmd.append(output_file)
+    return cmd
+
+
+def start_recording_process(input_url, output_file, force_mp3, loglevel):
+    """Start ffmpeg in background; returns Popen or None."""
     try:
-        # Construct the FFmpeg command
-        ffmpeg_command = [
-            "ffmpeg",
-            "-nostdin",  # avoid interactive stdin blocking
-            "-y",        # overwrite output file if exists
-            "-i",
-            input_url,  # input URL
-            "-vn",  # disable video recording
-            "-stats",  # show stats
-        ]
+        cmd = _build_ffmpeg_cmd(input_url, output_file, force_mp3, loglevel)
+        # Silence output to keep UI clean (unless debug)
+        # Always capture stdout for -progress parsing; suppress stderr unless debug
+        stdout = subprocess.PIPE
+        stderr = subprocess.PIPE if loglevel == "debug" else subprocess.DEVNULL
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=stdout,
+            stderr=stderr,
+            text=True,
+            bufsize=1,
+            universal_newlines=True,
+        )
+        log.debug(f"Record start PID={proc.pid}")
+        return proc
+    except Exception as e:
+        log.error(f"Failed to start recording: {e}")
+        return None
 
-        # codec for audio stream
-        ffmpeg_command.append("-c:a")
-        if force_mp3:
-            ffmpeg_command.append("libmp3lame")
-            log.debug("Record: force libmp3lame")
-        else:
-            # file will be saved as as provided. this is more error prone
-            # file extension must match the actual stream codec
-            ffmpeg_command.append("copy")
 
-        ffmpeg_command.append("-loglevel")
-        if loglevel == "debug":
-            ffmpeg_command.append("info")
-        else:
-            ffmpeg_command.append("error"),
-            ffmpeg_command.append("-hide_banner")
-
-        # output file
-        ffmpeg_command.append(output_file)
-
-        # Run FFmpeg command on foreground to catch 'q' without
-        # any complex thread for now
-        subprocess.run(ffmpeg_command, check=True)
-
-        log.debug("Record: {}".format(str(ffmpeg_command)))
-        log.info("Audio recorded successfully.")
-
-    except subprocess.CalledProcessError as e:
-        log.debug("Error: {}".format(e))
-        log.error(f"Error while recording audio: {e}")
-    except Exception as ex:
-        log.debug("Error: {}".format(ex))
-        log.error(f"An error occurred: {ex}")
+def stop_recording_process(proc):
+    try:
+        if proc and proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                proc.kill()
+    except Exception:
+        pass
