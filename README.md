@@ -53,17 +53,7 @@ This project is a maintained fork of Radio-Active created by Dipankar Pal (deep5
 
 Console commands installed: `radioactive` and `radio`.
 
-- Using pipx (recommended):
-```
-pipx install radio-active
-```
-
-- Using pip:
-```
-python -m pip install --upgrade radio-active
-```
-
-- From source:
+From source:
 ```
 git clone https://github.com/ms4ndst/radio-active.git
 cd radio-active
