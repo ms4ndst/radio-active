@@ -51,12 +51,30 @@ This project is a maintained fork of Radio-Active created by Dipankar Pal (deep5
 
 ### Install
 
-Simply run: `pip3 install --upgrade radio-active`
+Console commands installed: `radioactive` and `radio`.
 
-I recommend installing it using `pipx install radio-active`
+- Using pipx (recommended):
+```
+pipx install radio-active
+```
 
-#### TODO:
+- Using pip:
+```
+python -m pip install --upgrade radio-active
+```
 
+- From source:
+```
+git clone https://github.com/ms4ndst/radio-active.git
+cd radio-active
+python -m pip install --user -e .
+```
+
+On Windows, if the command isn’t found after install, add your user Scripts directory to PATH:
+```
+python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+```
+Add the printed path to your PATH, then restart the terminal.
 
 ### External Dependency
 
