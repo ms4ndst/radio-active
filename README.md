@@ -91,13 +91,6 @@ Search a station with `radio --search [STATION_NAME]` or simply `radio` :zap: to
 3. Let the app run for at least 5 seconds (not a serious issue though, for better performance)
 
 
-### Demo
-
-<!-- <a align=center href="https://www.youtube.com/watch?v=X-NfK5XbM90" target="_blank"> <img align=center src=https://user-images.githubusercontent.com/27947066/267328820-f7264e02-edc1-46f3-9548-5dfb50a6627d.jpg /> </a>
-<hr> -->
-<a align=center href="https://asciinema.org/a/611668" target="_blank"><img src="https://asciinema.org/a/617580.svg" /></a>
-
-
 ### Live UI Prompt
 
 When running with the Live UI (default, including when using `--auto-track`), the input prompt is rendered inside the Live panel, directly below the Now Playing info. You can type commands immediately without losing the panel.
