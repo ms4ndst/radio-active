@@ -91,6 +91,79 @@ _THEMES = {
         "border": "#7aa2f7",
         "title": "#bb9af7",
     },
+    # Additional popular themes
+    "gruvbox-light": {
+        "bg": "#fbf1c7",
+        "fg": "#3c3836",
+        "border": "#b57614",
+        "title": "#d79921",
+    },
+    "catppuccin-latte": {
+        "bg": "#eff1f5",
+        "fg": "#4c4f69",
+        "border": "#04a5e5",
+        "title": "#1e66f5",
+    },
+    "solarized-light": {
+        "bg": "#fdf6e3",
+        "fg": "#657b83",
+        "border": "#268bd2",
+        "title": "#b58900",
+    },
+    "github-light": {
+        "bg": "#ffffff",
+        "fg": "#24292e",
+        "border": "#0969da",
+        "title": "#8250df",
+    },
+    "one-light": {
+        "bg": "#fafafa",
+        "fg": "#383a42",
+        "border": "#4078f2",
+        "title": "#c18401",
+    },
+    "material-light": {
+        "bg": "#FAFAFA",
+        "fg": "#545454",
+        "border": "#2962ff",
+        "title": "#00c853",
+    },
+    "everforest-dark": {
+        "bg": "#2d353b",
+        "fg": "#d3c6aa",
+        "border": "#a7c080",
+        "title": "#e69875",
+    },
+    "palenight": {
+        "bg": "#292D3E",
+        "fg": "#A6ACCD",
+        "border": "#82AAFF",
+        "title": "#C792EA",
+    },
+    "horizon": {
+        "bg": "#1C1E26",
+        "fg": "#E0E0E0",
+        "border": "#E95378",
+        "title": "#FAB795",
+    },
+    "kanagawa": {
+        "bg": "#1F1F28",
+        "fg": "#DCD7BA",
+        "border": "#7E9CD8",
+        "title": "#957FB8",
+    },
+    "rose-pine": {
+        "bg": "#191724",
+        "fg": "#e0def4",
+        "border": "#31748f",
+        "title": "#eb6f92",
+    },
+    "rose-pine-moon": {
+        "bg": "#232136",
+        "fg": "#e0def4",
+        "border": "#3e8fb0",
+        "title": "#ea9a97",
+    },
 }
 
 _active_name = "classic"
