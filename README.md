@@ -60,6 +60,28 @@ cd radio-active
 python -m pip install --user -e .
 ```
 
+Linux (virtual environment):
+```
+# Install venv tools (Debian/Ubuntu)
+sudo apt-get update && sudo apt-get install -y python3-venv
+
+# Create and activate a venv
+python3 -m venv ~/.venvs/radio-active
+source ~/.venvs/radio-active/bin/activate
+
+# Clone and install inside the venv
+git clone https://github.com/ms4ndst/radio-active.git
+cd radio-active
+pip install -e .
+
+# Run (venv must be active)
+radioactive --version
+```
+To use without activating each time, add an alias to your shell profile:
+```
+alias radioactive="$HOME/.venvs/radio-active/bin/radioactive"
+```
+
 On Windows, if the command isn’t found after install, add your user Scripts directory to PATH:
 ```
 python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
