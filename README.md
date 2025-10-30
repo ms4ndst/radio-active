@@ -31,9 +31,6 @@
 
 </div>
 
-# Demo
-<p align=center> <img src=https://github.com/deep5050/radio-active/assets/27947066/358d5c7f-c501-4335-873b-a9a1dc45cd69 width=600px> </p>
-
 
 ### Features
 
@@ -56,7 +53,6 @@
 - [ ] I'm feeling lucky! Play Random stations
 
 
-> See my progress ➡️ [here](https://github.com/users/deep5050/projects/5)
 
 ### Why radioactive?
 
