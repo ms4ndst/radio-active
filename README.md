@@ -86,7 +86,7 @@ FFmpeg is required for this program to work correctly.
 
 - Windows (winget):
 ```
-winget install --id=FFmpeg.FFmpeg -e
+winget install BtbN.FFmpeg.GPL
 ```
 Then verify:
 ```
