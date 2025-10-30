@@ -291,7 +291,7 @@ Share you favorite list with  community 🌐 ➡️ [Here](https://github.com/de
 ### Support
 
 <p>
-<a href=https://deep5050.github.io/payme>Visit my contribution page for more payment options.
+<a href=https://deep5050.github.io/payme>Visit the original creators contribution page for more payment options.
 </p>
 <p align=center><a href="https://www.buymeacoffee.com/deep5050" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 40px !important;width: 117px !important;" ></a></p>
 
