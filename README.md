@@ -82,10 +82,18 @@ For other systems including Windows see the above link
 
 #### Installing FFmpeg
 
-FFmpeg is required for this program to work correctly. Install FFmpeg by following these steps:-
+FFmpeg is required for this program to work correctly.
 
-- On Linux - <https://www.tecmint.com/install-ffmpeg-in-linux/>
-- On Windows - <https://www.wikihow.com/Install-FFmpeg-on-Windows>
+- Windows (winget):
+```
+winget install --id=FFmpeg.FFmpeg -e
+```
+Then verify:
+```
+ffmpeg -version
+```
+- Linux: <https://www.tecmint.com/install-ffmpeg-in-linux/>
+- Windows (manual guide): <https://www.wikihow.com/Install-FFmpeg-on-Windows>
 
 
 ### Run
