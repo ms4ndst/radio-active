@@ -3,15 +3,7 @@
 <h1 align=center> RADIOACTIVE </h1>
 <p> SEARCH - PLAY - RECORD - REPEAT </p>
 
-
-
-
-
-
-
-<a href="https://www.producthunt.com/posts/radio-active?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-radio-active" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=305380&theme=dark" alt="radio-active - Play more than 30K radio stations from your terminal | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
-
- <p align=center ><img align=center src=https://static.pepy.tech/personalized-badge/radio-active?period=total&units=international_system&left_color=black&right_color=green&left_text=TotalInstalls></p>
+ <p align=center >SUPPORT THE ORIGINAL DEVELOPER HERE!</p>
  <p>
 <img width="500px" alt="UPI" src="https://raw.githubusercontent.com/deep5050/random-shits-happen-here/main/235618869-8c9d9bce-096d-469e-8f61-c29cc01eacc3%20(1).png">
 </p>
