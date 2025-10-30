@@ -82,6 +82,28 @@ To use without activating each time, add an alias to your shell profile:
 alias radioactive="$HOME/.venvs/radio-active/bin/radioactive"
 ```
 
+Arch Linux (virtual environment):
+```
+# Install Python venv tools and ffmpeg (Arch/Manjaro)
+sudo pacman -Syu --needed python-virtualenv python-pip ffmpeg
+
+# Create and activate a venv
+python -m venv ~/.venvs/radio-active
+source ~/.venvs/radio-active/bin/activate
+
+# Clone and install inside the venv
+git clone https://github.com/ms4ndst/radio-active.git
+cd radio-active
+pip install -e .
+
+# Run
+radioactive --version
+```
+If you prefer not to activate the venv each time, add an alias:
+```
+alias radioactive="$HOME/.venvs/radio-active/bin/radioactive"
+```
+
 On Windows, if the command isn’t found after install, add your user Scripts directory to PATH:
 ```
 python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
