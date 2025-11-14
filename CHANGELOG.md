@@ -3,9 +3,12 @@
 UI/VU Meter
 
 - Added animated retro-style VU meter display between INFO panel and keyboard shortcuts.
-- VU meter features 20 vertical bars with color-coded levels (green/yellow/red).
+- VU meter features 15 vertical bars (6 characters wide each) with 10 color-coded levels.
+- Color gradient from dark green (low) → bright green → yellow-green → yellow → bright yellow → orange → dark orange → bright red → red (critical).
 - Press `v` or `V` during playback to toggle VU meter on/off.
-- VU meter enabled by default and animates in real-time.
+- VU meter enabled by default and syncs to real-time audio levels using FFmpeg volumedetect.
+- Bars stop animating when playback is paused and resume when playing.
+- Uses half-height blocks (▄) for compact visual appearance.
 - Matches the C64-inspired retro aesthetic with smooth animations.
 
 UI/Keyboard
