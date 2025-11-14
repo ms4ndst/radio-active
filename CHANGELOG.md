@@ -1,3 +1,18 @@
+## 2.11.0 - VU Meter visualization
+
+UI/VU Meter
+
+- Added animated retro-style VU meter display between INFO panel and keyboard shortcuts.
+- VU meter features 20 vertical bars with color-coded levels (green/yellow/red).
+- Press `v` or `V` during playback to toggle VU meter on/off.
+- VU meter enabled by default and animates in real-time.
+- Matches the C64-inspired retro aesthetic with smooth animations.
+
+UI/Keyboard
+
+- Updated keyboard hints row to include `v=VU` shortcut.
+- Updated help menu (`h` key) to show VU meter toggle option.
+
 ## 2.10.1 - Recording progress, INFO input, dynamic width
 
 UI/Recording

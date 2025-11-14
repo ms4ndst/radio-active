@@ -26,6 +26,7 @@
 - [x] Selection menu for favorite stations
 - [x] Theme chooser with multiple color themes (Classic, Gruvbox, Catppuccin, One Dark Pro, Dracula, Solarized, Nord, Monokai, GitHub Dark, Material, Night Owl, Ayu, Tokyo Night)
 - [x] Live UI hints/tooltip match the active theme colors
+- [x] Animated VU meter visualization with color-coded levels :bar_chart:
 - [x] Supports user-added stations :wrench:
 - [x] Looks minimal and user-friendly
 - [x] Runs on Raspberry Pi
@@ -259,6 +260,7 @@ n: Record with custom filename (prompt inside INFO)
 f/fav: Add station to favorite list
 w/list: Show favorites inside INFO and select by number (no Enter needed)
 t/theme: Theme chooser (applies instantly, hints recolor)
+v/vu: Toggle VU meter display (animated audio level visualization)
 h/help/?: Show this help message
 q/quit: Quit radioactive
 ```

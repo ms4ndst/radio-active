@@ -67,6 +67,12 @@ _force_mp3_always = False
 _rec_proc = None
 _rec_outfile = ""
 _rec_thread = None
+# VU meter state
+_vu_meter_levels = []
+_vu_meter_enabled = True
+_vu_meter_audio_thread = None
+_vu_meter_audio_levels = []  # Real-time audio levels from ffmpeg
+_vu_meter_is_playing = True  # Track if player is playing or paused
 
 
 def ui_info(message: str):
@@ -158,6 +164,148 @@ def _make_header_panel() -> Panel:
     return make_panel(head, title="[ui.title]RADIO-ACTIVE[/]")
 
 
+def _analyze_audio_levels(url: str):
+    """Background thread to analyze audio levels from the stream using ffmpeg."""
+    global _vu_meter_audio_levels, _vu_meter_is_playing
+    
+    # Use ffmpeg to continuously sample audio volume
+    cmd = [
+        "ffmpeg",
+        "-i", url,
+        "-af", "volumedetect",
+        "-vn",
+        "-f", "null",
+        "-t", "1",  # Sample 1 second at a time
+        "-"
+    ]
+    
+    while True:
+        if not _vu_meter_is_playing:
+            sleep(0.5)
+            continue
+            
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=3
+            )
+            
+            # Parse mean_volume from output
+            output = result.stderr
+            for line in output.split('\n'):
+                if "mean_volume:" in line:
+                    try:
+                        # Extract dB value (e.g., "mean_volume: -23.5 dB")
+                        db_str = line.split("mean_volume:")[1].split("dB")[0].strip()
+                        db_value = float(db_str)
+                        
+                        # Convert dB to normalized 1-10 scale for 10 color sections
+                        # Reduced sensitivity by 20% (wider dB range: -70dB = 1, -10dB = 10)
+                        normalized = int(((db_value + 50) / 60) * 9) + 1
+                        normalized = max(1, min(10, normalized))
+                        
+                        # Generate multiple bar values with variation
+                        for _ in range(15):
+                            variation = randint(-1, 2)
+                            level = max(1, min(10, normalized + variation))
+                            _vu_meter_audio_levels.append(level)
+                        
+                        # Keep buffer reasonable
+                        if len(_vu_meter_audio_levels) > 50:
+                            _vu_meter_audio_levels = _vu_meter_audio_levels[-50:]
+                        break
+                    except (ValueError, IndexError) as e:
+                        log.debug(f"Parse error: {e}")
+                        
+        except subprocess.TimeoutExpired:
+            log.debug("Audio sample timeout")
+        except Exception as e:
+            log.debug(f"Audio analysis error: {e}")
+            sleep(1)
+
+
+def _make_vu_meter() -> Text:
+    """Create a compact retro-style VU meter display synced to audio."""
+    global _vu_meter_levels, _vu_meter_audio_levels, _vu_meter_is_playing
+    from radioactive.c64_theme import get_palette
+    
+    palette = get_palette()
+    num_bars = 15  # Fewer bars for wider appearance
+    max_height = 10  # 10 sections for color gradation
+    
+    # If player is paused, show static low bars
+    if not _vu_meter_is_playing:
+        _vu_meter_levels = [1] * num_bars  # All bars at minimum
+    # Always animate the levels for smooth movement when playing
+    elif _vu_meter_audio_levels and len(_vu_meter_audio_levels) >= 10:
+        # Use actual audio levels from stream as base
+        recent_levels = _vu_meter_audio_levels[-15:]
+        # Distribute across all bars
+        _vu_meter_levels = []
+        for i in range(num_bars):
+            idx = int((i / num_bars) * len(recent_levels))
+            base = recent_levels[idx]
+            # Small random variation for natural look
+            _vu_meter_levels.append(max(1, min(max_height, base + randint(0, 1))))
+    else:
+        # Initialize or animate levels if no audio data yet
+        if not _vu_meter_levels or len(_vu_meter_levels) != num_bars:
+            _vu_meter_levels = [randint(2, 10) for _ in range(num_bars)]
+        else:
+            # Animate with music-like movement
+            _vu_meter_levels = [
+                max(1, min(max_height, level + randint(-2, 3))) 
+                for level in _vu_meter_levels
+            ]
+    
+    # Build the VU meter bars using theme colors - double-width bars with spacing
+    bar_lines = []
+    
+    # Define 10 color levels with gradation from green (low) -> yellow (mid) -> red (high)
+    def get_bar_color(row: int) -> str:
+        """Get color for each height level (1-10)"""
+        if row >= 10:  # Row 10: Critical red
+            return "red"
+        elif row >= 9:  # Row 9: Bright red
+            return "bright_red"
+        elif row >= 8:  # Row 8: Dark orange
+            return "dark_orange"
+        elif row >= 7:  # Row 7: Orange
+            return "orange1"
+        elif row >= 6:  # Row 6: Yellow
+            return "yellow"
+        elif row >= 5:  # Row 5: Bright yellow
+            return "bright_yellow"
+        elif row >= 4:  # Row 4: Yellow-green
+            return "green_yellow"
+        elif row >= 3:  # Row 3: Green
+            return "green"
+        elif row >= 2:  # Row 2: Bright green
+            return "bright_green"
+        else:  # Row 1: Dark green
+            return "dark_green"
+    
+    # Draw from top to bottom
+    for row in range(max_height, 0, -1):
+        line_parts = []
+        for level in _vu_meter_levels:
+            if level >= row:
+                # Filled bar segment - use 6-character wide half-height blocks with color gradation
+                color = get_bar_color(row)
+                line_parts.append(f"[{color}]▄▄▄▄▄▄[/]")
+            else:
+                line_parts.append("[dim]······[/dim]")  # Empty indicator (6 dots)
+        bar_lines.append(" ".join(line_parts))  # Add spacing between bars
+    
+    # Add baseline with theme border color
+    bar_lines.append(f"[{palette['border']}]" + "━" * (num_bars * 6 + num_bars - 1) + "[/]")
+    
+    vu_text = Text.from_markup("\n".join(bar_lines), justify="center")
+    return vu_text
+
+
 def _make_now_playing_view(station_name: str, track_title: str, hints: str, messages):
     # Header (always visible at top)
     panel_head = _make_header_panel()
@@ -169,13 +317,15 @@ def _make_now_playing_view(station_name: str, track_title: str, hints: str, mess
     else:
         info_body = Text("\n".join(messages) if messages else "")
     panel_info = make_panel(info_body, title="[ui.title]INFO[/]")
+    # VU Meter between INFO and keyboard hints
+    vu_meter = _make_vu_meter() if _vu_meter_enabled else Text("")
     # Keys row
     # Hints styled to match active theme colors
     if hints:
         hints_text = Text.from_markup(hints, style=active_style())
     else:
         hints_text = Text("", style=active_style())
-    return Group(panel_head, panel_now, panel_info, hints_text)
+    return Group(panel_head, panel_now, panel_info, vu_meter, hints_text)
 
 
 def _update_live_view():
@@ -333,10 +483,11 @@ def start_now_playing_live(station_name: str, target_url: str, interval_seconds:
     """Start Live UI and a background worker that updates song title."""
     global _global_now_playing_live, _global_now_playing_station, _global_now_playing_title
     global _global_now_playing_hints, _global_now_playing_messages, global_current_station_info, _global_now_playing_url
+    global _vu_meter_audio_thread, _vu_meter_audio_levels
 
     _global_now_playing_station = station_name
     _global_now_playing_title = ""
-    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  i=Info  r=Record  n=RecordFile  f=Fav  w=List  t=Theme  h=Help  q=Quit"
+    _global_now_playing_hints = "[dim]Keys:[/dim] p=Play/Pause  i=Info  r=Record  n=RecordFile  f=Fav  w=List  t=Theme  v=VU  h=Help  q=Quit"
     _global_now_playing_messages = []
     _global_now_playing_url = target_url or ""
 
@@ -348,6 +499,16 @@ def start_now_playing_live(station_name: str, target_url: str, interval_seconds:
         }
     except Exception:
         pass
+
+    # Start audio analysis thread for VU meter
+    if _vu_meter_enabled and target_url:
+        _vu_meter_audio_levels = []
+        _vu_meter_audio_thread = threading.Thread(
+            target=_analyze_audio_levels, 
+            args=(target_url,), 
+            daemon=True
+        )
+        _vu_meter_audio_thread.start()
 
     console = themed_console()
     live = Live(
@@ -369,29 +530,47 @@ def start_now_playing_live(station_name: str, target_url: str, interval_seconds:
         global _global_now_playing_title, _global_now_playing_input_active, _global_now_playing_url
         last_title = None
         last_url = None
+        title_check_counter = 0
+        vu_update_interval = 0.125  # Update VU meter 8 times per second
+        title_check_interval = int(interval / vu_update_interval)  # Check title every 'interval' seconds
+        
         while True:
             try:
+                # Always update the live view to animate VU meter
+                if not _global_now_playing_input_active:
+                    _update_live_view()
+                
                 if _global_now_playing_input_active:
                     sleep(0.1)
                     continue
+                
                 url = _global_now_playing_url
                 if not url:
-                    sleep(interval)
+                    sleep(vu_update_interval)
                     continue
+                
                 if url != last_url:
                     # reset title state when URL changes
                     last_title = None
                     _global_now_playing_title = ""
                     _update_live_view()
                     last_url = url
-                title = get_song_title(url)
-                if title and title != last_title:
-                    _global_now_playing_title = title
-                    _update_live_view()
-                    last_title = title
+                    title_check_counter = 0
+                
+                # Only check for new song title every 'interval' seconds
+                title_check_counter += 1
+                if title_check_counter >= title_check_interval:
+                    title = get_song_title(url)
+                    if title and title != last_title:
+                        _global_now_playing_title = title
+                        _update_live_view()
+                        last_title = title
+                    title_check_counter = 0
+                    
             except Exception as e:
                 log.debug(f"live worker error: {e}")
-            sleep(interval)
+            
+            sleep(vu_update_interval)  # Short sleep for smooth VU meter animation
 
     threading.Thread(target=_worker, args=(interval_seconds,), daemon=True).start()
 
@@ -838,8 +1017,12 @@ def _handle_keypress_loop_hotkeys(
 ):
     def _handle(ch: str):
         nonlocal record_file_format, player, target_url, station_name, station_url
+        global _vu_meter_is_playing
         if ch in ("p", "P"):
             player.toggle()
+            # Toggle VU meter playing state
+            _vu_meter_is_playing = not _vu_meter_is_playing
+            _update_live_view()
         elif ch in ("i", "I"):
             handle_show_station_info()
         elif ch in ("r", "R"):
@@ -978,9 +1161,15 @@ def _handle_keypress_loop_hotkeys(
                 "f/fav: Add station to favorite list",
                 "w/list: Show favorites and select",
                 "t/theme: Theme chooser",
+                "v/vu: Toggle VU meter display",
                 "h/help/?: Show this help message",
                 "q/quit: Quit radioactive",
             ])
+        elif ch in ("v", "V"):
+            global _vu_meter_enabled
+            _vu_meter_enabled = not _vu_meter_enabled
+            status = "enabled" if _vu_meter_enabled else "disabled"
+            set_info_text(f"VU meter {status}")
         elif ch in ("q", "Q"):
             player.stop()
             sys.exit(0)
