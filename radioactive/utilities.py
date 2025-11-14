@@ -263,29 +263,29 @@ def _make_vu_meter() -> Text:
     # Build the VU meter bars using theme colors - double-width bars with spacing
     bar_lines = []
     
-    # Define 10 color levels with gradation from green (low) -> yellow (mid) -> red (high)
+    # Define 10 color levels using theme palette VU meter colors with gradation
     def get_bar_color(row: int) -> str:
-        """Get color for each height level (1-10)"""
-        if row >= 10:  # Row 10: Critical red
-            return "red"
-        elif row >= 9:  # Row 9: Bright red
-            return "bright_red"
-        elif row >= 8:  # Row 8: Dark orange
-            return "dark_orange"
-        elif row >= 7:  # Row 7: Orange
-            return "orange1"
-        elif row >= 6:  # Row 6: Yellow
-            return "yellow"
-        elif row >= 5:  # Row 5: Bright yellow
-            return "bright_yellow"
-        elif row >= 4:  # Row 4: Yellow-green
-            return "green_yellow"
-        elif row >= 3:  # Row 3: Green
-            return "green"
-        elif row >= 2:  # Row 2: Bright green
-            return "bright_green"
-        else:  # Row 1: Dark green
-            return "dark_green"
+        """Get color for each height level (1-10) using theme VU colors"""
+        if row >= 10:  # Row 10: Critical
+            return palette['vu_critical']
+        elif row >= 9:  # Row 9: Critical low
+            return palette['vu_critical_low']
+        elif row >= 8:  # Row 8: Very high
+            return palette['vu_very_high']
+        elif row >= 7:  # Row 7: High
+            return palette['vu_high']
+        elif row >= 6:  # Row 6: Mid-high
+            return palette['vu_mid_high']
+        elif row >= 5:  # Row 5: Mid
+            return palette['vu_mid']
+        elif row >= 4:  # Row 4: Mid-low
+            return palette['vu_mid_low']
+        elif row >= 3:  # Row 3: Low (higher)
+            return palette['vu_low']
+        elif row >= 2:  # Row 2: Low
+            return palette['vu_low']
+        else:  # Row 1: Very low
+            return palette['vu_low']
     
     # Draw from top to bottom
     for row in range(max_height, 0, -1):
@@ -302,7 +302,7 @@ def _make_vu_meter() -> Text:
     # Add baseline with theme border color
     bar_lines.append(f"[{palette['border']}]" + "━" * (num_bars * 6 + num_bars - 1) + "[/]")
     
-    vu_text = Text.from_markup("\n".join(bar_lines), justify="center")
+    vu_text = Text.from_markup("\n".join(bar_lines), justify="left")
     return vu_text
 
 
