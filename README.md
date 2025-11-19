@@ -9,7 +9,7 @@
 </p>
 
 <p align=center>
-<img align=center src=https://github.com/ms4ndst/radio-active/blob/main/images/main%20gui.png  width=550px>
+<img align=center src=https://github.com/ms4ndst/radio-active/blob/main/images/main%20gui.gif  width=550px>
 <hr>
 
 
